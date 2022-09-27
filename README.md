@@ -14,8 +14,8 @@ Converted from the python code of our project:　[wwave_sunmore](https://github.
 
 1. Install jtop
 ```
-sudo apt install python3-pip
-sudo -H pip3 install -U jetson-stats
+sudo apt install python-pip
+sudo -H pip install -U jetson-stats
 sudo systemctl restart jetson_stats.service
 init 6
 ```

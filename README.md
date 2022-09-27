@@ -56,7 +56,6 @@ gcc -O3 -o vitial_signs *.c -lm
 
 3. Execution commands.
 ```
-Windows: vitial_signs
 Linux: ./vitial_signs
 ```
 
@@ -84,6 +83,5 @@ gcc -Os -o sleeping *.c sleep_feature_min_rf.a -lm
 
 4. Execution commands.
 ```
-Windows: sleeping
 Linux: ./sleeping
 ```

@@ -66,6 +66,7 @@ cd <your repositories path>/sleeping
 ```
 gcc -Os -c sleep_feature_min_rf.c -lm
 ar -rcs sleep_feature_min_rf.a sleep_feature_min_rf.o
+rm -rf sleep_feature_min_rf.c
 ```
 
 3. Compiling C Program.

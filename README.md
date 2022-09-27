@@ -4,7 +4,7 @@
 ------------
 
 
-This repository contains code for sunmoretek mmWave radar **Vitial Signs(Breath rate & Heart rate)** and **Sleeping stage** C Code Version.
+This repository contains code for sunmoretek mmWave radar **Vitial Signs(Breath rate & Heart rate)** , **Sleeping stage** , **Animal** and **People** C Code Version.
 Converted from the python code of our project:　[wwave_sunmore](https://github.com/zx50814558/wwave_sunmore.git "wwave_sunmore")
 
 ### Prepare

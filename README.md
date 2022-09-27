@@ -85,3 +85,43 @@ gcc -Os -o sleeping *.c sleep_feature_min_rf.a -lm
 ```
 Linux: ./sleeping
 ```
+
+### Running ( Animal )
+
+------------
+
+
+1. Setting up the path.
+```
+cd <your repositories path>/animal
+```
+
+2. Compiling C Program.
+```
+gcc pc3_animal.c -o pc3_animal -lm
+```
+
+3. Execution commands.
+```
+Linux: ./pc3_animal
+```
+
+### Running ( People )
+
+------------
+
+
+1. Setting up the path.
+```
+cd <your repositories path>/people
+```
+
+2. Compiling C Program.
+```
+gcc pc3_read_backup.c -o pc3_read_backup -lm
+```
+
+3. Execution commands.
+```
+Linux: ./pc3_read_backup
+```

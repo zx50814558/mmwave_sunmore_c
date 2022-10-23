@@ -23,12 +23,16 @@
 struct timeval start, stop;
 double secs = 0;
 
+/*
+input: 輸入訊號
+delta: 左右延伸的窗格長度
+len_: 輸入資料長度*/
 double *MLR(double *input, int delta, int len_)
 {
-	double *data_s = input;
+	double *data_s = input;  // 取得輸入訊號
 
-	// Dynamic memory management
-	double mean_ptr[799] = {0};
+	// 建立空矩陣
+	double mean_ptr[799] = {0};  
 	double m_ptr[799] = {0};
 	double b_ptr[799] = {0};
 
@@ -47,10 +51,14 @@ double *MLR(double *input, int delta, int len_)
 		{
 			int star = t - delta;
 			int end = t + delta + 1;
+
+			// 窗格內算平均
 			double mean_tmp = 0;
 			for (int j = 0; j < end - star; j++)
 				mean_tmp += input[star + j];
 			mean_ptr[t] = (mean_tmp / (end - star));
+
+			// Slope & bias
 			double mtmp = 0;
 			for (int i = -delta; i < delta + 1; i++)
 				mtmp += i * (input[t + i] - mean_ptr[t]);
@@ -67,19 +75,24 @@ double *MLR(double *input, int delta, int len_)
 			double tmp_s = 0;
 			for (int i = t - delta; i < t + delta; i++)
 			{
-				tmp_s += (m_ptr[i] * t) + b_ptr[i];
+				tmp_s += (m_ptr[i] * t) + b_ptr[i];  // y = mt + b
 			}
-			data_s[t] = tmp_s / (2 * delta + 1);
+			data_s[t] = tmp_s / (2 * delta + 1);  // mean
 		}
 	}
 
 	return data_s;
 }
 
+/*
+x: 輸入訊號
+len_s: 輸入訊號長度，因為是平滑化後的值，在尾端加 s
+midpoints: 以指標傳入的陣列，用來回傳值
+m: 指標，用以記錄 local maxima features 的數量*/
 int *_local_maxima_1d(double *x, int len_s, int *midpoints, int *m)
 {
 
-	// Dynamic memory management
+	// 初始化陣列
 	int left_edges[400] = {0};  // default 399
 	int right_edges[400] = {0};  // default 399
 	int i_ahead = 0;
@@ -113,7 +126,7 @@ int *_local_maxima_1d(double *x, int len_s, int *midpoints, int *m)
 				i = i_ahead;
 			}
 		}
-		i += 1;
+		i += 1;  // Next elements
 	}
 
 	return midpoints;
@@ -161,6 +174,10 @@ int partition(int array[], int low, int high)
 	return (i + 1);
 }
 
+/*
+array: 輸入陣列
+low: Sort 最小位置 ( 開始 )
+high: Sort 最小位置 ( 結束 )*/
 void quickSort(int array[], int low, int high)
 {
 	if (low < high)
@@ -240,6 +257,16 @@ void array_shift()
 	}
 }
 
+/*Filter data along one-dimension with an IIR or FIR filter.
+b: The numerator coefficient vector in a 1-D sequence.
+a: The denominator coefficient vector in a 1-D sequence.
+x: Signal after noise removal
+y: Output filtered signal.
+Z: Initial conditions for the filter delays. It is a vector (or array of vectors for an N-dimensional input) of length max(len(a), len(b)) - 1.
+len_b: The parameter length of b and a.
+len_x: The length of x
+stride_X: default 1
+stride_Y: default 1*/
 static void lfilter(double *b, double *a, double *x, double *y, double *Z, int len_b, uint32_t len_x, int stride_X, int stride_Y)
 {
 
@@ -302,17 +329,20 @@ void mean_fn_double (double *sig, int sig_len, double *output_d)
 
 int main(void)
 {
-
-	int len_s_half;
-	int *feature_peak, *feature_valley;
+	/* Initialize (Feature_detection) */
+	int len_s_half;  // Signal length and half length
+	int *feature_peak, *feature_valley;  // 回傳 Feature_detection 後 peak array 與 valley array 的指標
 	int m_p, m_v; // Number of peak & valley
-	double neg_x[799] = {0};
+	double neg_x[799] = {0};  // 將原先的訊號上下反轉，用來取 feature_valley 的數值
 
-	// Initialize (feature_compress)
-	int start_feature, end_feature, ltera_add, time_thr;
-	int location, ltera, sum_v, sum_p;
+	/* Initialize (feature_compress) */
+	int start_feature, end_feature;  // Record start and end at valley or peak (peak:0 valley:1)
+	int ltera_add;  // 用來做窗格內值的 Shift
+	int time_thr;  // 判斷訊號間的 valley or peak 是否過於接近 (呼吸: 22, 心跳: 5)
+	int location;  // 用於取值
+	int ltera, sum_v, sum_p;  // 第幾輪, compress 後共幾個 valley, compress 後共幾個 peak
 
-	int serial_port = open("/dev/ttyTHS1", O_RDWR);
+	int serial_port = open("/dev/ttyTHS1", O_RDWR);  // 設定 port 號
 	struct termios tty;
 
 	if (tcgetattr(serial_port, &tty) != 0)
@@ -367,41 +397,44 @@ int main(void)
 	unsigned int int16_temp[16];
 	int magicWord[8] = {2, 1, 4, 3, 6, 5, 8, 7};
 
-	//讀值之後的變數
-	time_t start_time;
-	start_time = time(NULL);
-	int array_index = 0;
-	float phase_diff[799];
-	double removed_noise[799];
-	float forward, backward;
-	float hr_mean_FFT, hr_mean_xCorr, br_mean_FFT, br_mean_xCorr, breath_mean_ti, heart_mean_ti;
-	float thr;
+	/* Initialize */
+	time_t start_time;  // 宣告時間變數 (開始時間)
+	start_time = time(NULL);  // 讀取當前時間做為 (開始時間)
+	int array_index = 0;  // 輸入值累加數量 ( 需累加到 800 個值才開始執行後續算法)
+	float phase_diff[799];  // 宣告存放相位差的陣列 (長度 799)
+	double removed_noise[799];  // 宣告存放 Remove_impulse_noise 後的陣列 (長度 799)
+	float forward, backward;  // 算法中暫存的變數 ( forward: 窗格中心點減其一個值, backward: 窗格中心點減其一個值)
+	float hr_mean_FFT, hr_mean_xCorr, br_mean_FFT, br_mean_xCorr, breath_mean_ti, heart_mean_ti;  // 用於計算平均數值，每項共 800 個值，累加後取平均
+	float thr;  // 宣告 Remove_impulse_noise 時要濾除的閾值
 
-	// 動態記憶體
-	int total_feature[800] = {0};
-	int feature_compress_valley[800] = {0};
-	int feature_compress_peak[800] = {0};
-	int compress_feature[800] = {0};
-	int NT_point[800] = {0};
-	int NB_point[800] = {0};
-	double signal_pad[1600] = {0};
+	/* Feature compress */
+	int total_feature[800] = {0};  // 存放所有的特徵 ( valley or peak )
+	int feature_compress_valley[800] = {0};  // 存放 compress 後留下來沒被濾除的 valley 特徵
+	int feature_compress_peak[800] = {0};  // 存放 compress 後留下來沒被濾除的 peak 特徵
+	int compress_feature[800] = {0};  // 用於代表 Feature compress 後輸出的所有特徵 ( valley or peak )
+	int NT_point[800] = {0};  // 累加 compress 後剩下幾個 peak feature
+	int NB_point[800] = {0};  // 累加 compress 後剩下幾個 valley feature
 
-    // People detect
-    double current_window_ebr[60] = {0};
-    double current_window_ehr[60] = {0};
-    int eng_index = 0;
+	/* Candidate search */
+	double signal_pad[1600] = {0};  // 存放 Candidate search 算法過程中的值
 
-	// 最後答案
-	double br_rate, hr_rate;
-	int hours, minutes, seconds;
-	time_t now_record;
+    /* People detect */
+    double current_window_ebr[60] = {0};  // 用於累加呼吸律的平均能量，判斷人在不再
+    double current_window_ehr[60] = {0};  // 用於累加呼吸律的平均能量，判斷人在不再
+    int eng_index = 0;  // 陣列的 index 方便記錄目前蒐集到幾個值 ( 呼吸心律共用 )
 
-    char filename[100] = {0};
+	/* Final results  */
+	double br_rate, hr_rate;  // 紀錄呼吸律與心律
+	int hours, minutes, seconds;  // 完成一輪後的當下時間，用於 log
+	time_t now_record;  // 宣告時間變數
+
+	/* File handling */
+    char filename[100] = {0};  // 檔名
     char input_name[100];
     char *input_n;
-    char *root_dir = "dataset/"; // 改檔名
-    printf("Input file name = ");
-    input_n = fgets(input_name, 100, stdin);
+    char *root_dir = "dataset/"; // 檔案路徑
+    printf("Input file name = ");  // 輸入檔名的提示
+    input_n = fgets(input_name, 100, stdin);  // 寫入檔名
     input_n[strcspn(input_n, "\r\n")] = 0;
     strcat(filename, root_dir);
     strcat(filename, input_name);
@@ -415,8 +448,10 @@ int main(void)
 	fprintf(fp, "Times, heart, breath\n");
 	fclose(fp);
 
+	/* Start execution of the algorithm */
 	while (1)
 	{
+		/* 從雷達讀取檔案資料 */
 		while ((size = read(serial_port, &read_buf, sizeof(read_buf) - 1)) > 0)
 		{
 			// printf("----------start-----------\n");
@@ -531,54 +566,63 @@ int main(void)
 			break;
 		}
 
-		// Reading data
-		time_t end_time;
-		end_time = time(NULL);
+		/* 將讀取到並解碼後的資料累加，並接續使用 */
+		time_t end_time;  // 宣告結束時間
+		end_time = time(NULL);  // 以當前時間當作結束時間
+
+		/* 呼吸律與心律的能量蒐集，當超過 60 個時向左 Shift 並推疊最新的數值到陣列尾端 */
 		if (eng_index < 60)
 		{
-			current_window_ebr[eng_index] = vsos_array[22];
-			current_window_ehr[eng_index] = vsos_array[23];
-			eng_index++;
+			current_window_ebr[eng_index] = vsos_array[22];  // 小於 60 時以索引值讀入呼吸能量
+			current_window_ehr[eng_index] = vsos_array[23];  // 小於 60 時以索引值讀入心律能量
+			eng_index++;  // 索引值 +1 ，下一輪指到下一個位置
 		}
 		else {
+			// 當推疊資料超過 60 個，先做左 Shift
 			for (int i_eng = 0; i_eng < 59; i_eng++) {
-				current_window_ebr[i_eng] = current_window_ebr[i_eng + 1];
-				current_window_ehr[i_eng] = current_window_ehr[i_eng + 1];
+				current_window_ebr[i_eng] = current_window_ebr[i_eng + 1];  // 呼吸
+				current_window_ehr[i_eng] = current_window_ehr[i_eng + 1];  // 心律
 			}
-			current_window_ebr[59] = vsos_array[22];
-			current_window_ehr[59] = vsos_array[23];
+			// 將新的值取代最後一個值
+			current_window_ebr[59] = vsos_array[22];  // 呼吸
+			current_window_ehr[59] = vsos_array[23];  // 心律
 		}
 
+		/* 演算法所需資料蒐集，當超過 800 個時向左 Shift 並推疊最新的數值到陣列尾端 */
 		if (array_index < 800)
 		{
-			unwrapPhasePeak_mm[array_index] = vsos_array[7];
-			heartRateEst_FFT_mean[array_index] = vsos_array[10];
-			heartRateEst_xCorr_mean[array_index] = vsos_array[12];
-			breathingEst_FFT_mean[array_index] = vsos_array[14];
-			breathingEst_xCorr_mean[array_index] = vsos_array[15];
-			breath_ti[array_index] = vsos_array[25];
-			heart_ti[array_index] = vsos_array[26];
-			array_index++;
+			unwrapPhasePeak_mm[array_index] = vsos_array[7];  // unwrapPhasePeak_mm
+			heartRateEst_FFT_mean[array_index] = vsos_array[10];  // heartRateEst_FFT
+			heartRateEst_xCorr_mean[array_index] = vsos_array[12];  // heartRateEst_xCorr
+			breathingEst_FFT_mean[array_index] = vsos_array[14];  // breathingEst_FFT
+			breathingEst_xCorr_mean[array_index] = vsos_array[15];  // breathingEst_xCorr
+			breath_ti[array_index] = vsos_array[25];  // ti 預測呼吸律
+			heart_ti[array_index] = vsos_array[26];  // ti 預測心律
+			array_index++;  // 更新索引值
 		}
 		else
 		{
-			// Array shift
-			array_shift();
-			unwrapPhasePeak_mm[799] = vsos_array[7];
-			heartRateEst_FFT_mean[799] = vsos_array[10];
-			heartRateEst_xCorr_mean[799] = vsos_array[12];
-			breathingEst_FFT_mean[799] = vsos_array[14];
-			breathingEst_xCorr_mean[799] = vsos_array[15];
-			breath_ti[799] = vsos_array[25];
-			heart_ti[799] = vsos_array[26];
+			array_shift();  // 左 Shift 矩陣內部所有值，進入這部分代表已經取得所需特徵數量，因此需更新陣列內所有值
+			unwrapPhasePeak_mm[799] = vsos_array[7];  // 並推疊最新的數值到陣列尾端
+			heartRateEst_FFT_mean[799] = vsos_array[10];  // 並推疊最新的數值到陣列尾端
+			heartRateEst_xCorr_mean[799] = vsos_array[12];  // 並推疊最新的數值到陣列尾端
+			breathingEst_FFT_mean[799] = vsos_array[14];  // 並推疊最新的數值到陣列尾端
+			breathingEst_xCorr_mean[799] = vsos_array[15];  // 並推疊最新的數值到陣列尾端
+			breath_ti[799] = vsos_array[25];  // 並推疊最新的數值到陣列尾端
+			heart_ti[799] = vsos_array[26];  // 並推疊最新的數值到陣列尾端
+
+			/* 當結束時間 - 開始時間 >= 1，開始執行算法，代表每間格 1 秒執行一次 */
 			if (end_time - start_time >= 1)
 			{
+
+				/* 紀錄當前時間 */
 				time(&now_record);
 				struct tm *local = localtime(&now_record);
 				hours = local->tm_hour;         // 獲取自午夜以來的小時數 (0-23)
 				minutes = local->tm_min;        // 獲取小時後經過的分鐘數 (0-59)
 				seconds = local->tm_sec;        // 獲取一分鐘後經過的秒數 (0-59)
 
+				/* 計算參數平均 */
 				// Reset average parameters
 				hr_mean_FFT = 0;
 				hr_mean_xCorr = 0;
@@ -586,8 +630,7 @@ int main(void)
 				br_mean_xCorr = 0;
 				breath_mean_ti = 0;
 				heart_mean_ti = 0;
-
-				// Calculated average
+				// Calculated average ( 累加 )
 				for (int i = 0; i < 800; i++){
 					hr_mean_FFT += heartRateEst_FFT_mean[i];
 					hr_mean_xCorr += heartRateEst_xCorr_mean[i];
@@ -596,6 +639,7 @@ int main(void)
 					breath_mean_ti += breath_ti[i];
 					heart_mean_ti += heart_ti[i];
 				}
+				// Calculated average ( 取平均 )
 				hr_mean_FFT = hr_mean_FFT / 800;
 				hr_mean_xCorr = hr_mean_xCorr / 800;
 				br_mean_FFT = br_mean_FFT / 800;
@@ -605,47 +649,56 @@ int main(void)
 
 				// printf("\nhr_mean_FFT = %f\nhr_mean_xCorr = %f\nbr_mean_FFT = %f\nbr_mean_xCorr = %f\n", hr_mean_FFT, hr_mean_xCorr, br_mean_FFT, br_mean_xCorr);
 				// printf("\nTI BR = %f, TI HR = %f\n", breath_mean_ti, heart_mean_ti);
-				start_time = end_time;
+				start_time = end_time;  // 當執行上述步驟後，更開始時間為結束時間，以便後續間隔 1 秒執行
 
 				// --------------------- Phase_difference --------------------- 
-				size_t len_unwrapPhasePeak_mm = sizeof(unwrapPhasePeak_mm) / sizeof(unwrapPhasePeak_mm[0]);
+				size_t len_unwrapPhasePeak_mm = sizeof(unwrapPhasePeak_mm) / sizeof(unwrapPhasePeak_mm[0]);  // 取得 unwrapPhasePeak_mm 長度
 				for (int num = 1; num < len_unwrapPhasePeak_mm; num++)
 				{
-					phase_diff[num - 1] = unwrapPhasePeak_mm[num] - unwrapPhasePeak_mm[num - 1];
+					phase_diff[num - 1] = unwrapPhasePeak_mm[num] - unwrapPhasePeak_mm[num - 1];  // 將後一個值減去前一個並存入 phase_diff 中
 				}
 
-				// For breathing heartbeat loop
+				// For breathing heartbeat loop ( 0: 呼吸, 1: 心律)
 				for (int br0hr1 = 0; br0hr1 < 2; br0hr1++){
 
 					// Remove_impulse_noise
-					size_t len_phase_diff = sizeof(phase_diff) / sizeof(phase_diff[0]);
+					size_t len_phase_diff = sizeof(phase_diff) / sizeof(phase_diff[0]);  // 取得 phase_diff 長度
+					
+					// 根據呼吸律或是心律設定不同的閾值
 					if (br0hr1 == 0)
 						thr = 1.5;
 					else
 						thr = 1.5;
+					
+					// 第一項無須處理，直接放入新的陣列
 					removed_noise[0] = phase_diff[0];
+
+					// removed_noise 演算法: 在窗格大小為 3 的陣列當中，中間項減去前一項 = forward, 中間項減去後一項 = backward
 					for (int num = 1; num < len_phase_diff - 1; num++)
 					{
-						forward = phase_diff[num] - phase_diff[num - 1];
-						backward = phase_diff[num] - phase_diff[num + 1];
+						forward = phase_diff[num] - phase_diff[num - 1];  // 中間項減去前一項
+						backward = phase_diff[num] - phase_diff[num + 1];  // 中間項減去後一項
+
+						// 若兩項特徵同時超出閾值則設進行處理
 						if ((forward > thr && backward > thr) || (forward < -thr && backward < -thr))
 						{
 							// printf("%f\n", phase_diff[num-1] + (phase_diff[num+1] -  phase_diff[num-1])/2);
-							removed_noise[num] = (double)phase_diff[num - 1] + (double)(phase_diff[num + 1] - (double)phase_diff[num - 1]) / 2;
+							removed_noise[num] = (double)phase_diff[num - 1] + (double)(phase_diff[num + 1] - (double)phase_diff[num - 1]) / 2;  // 處理算法: 前一項 + (後一項 - 前一項) / 2
 						}
-						removed_noise[num] = (double)phase_diff[num];
+						removed_noise[num] = (double)phase_diff[num];  // 若判定為正常值，沿用原始數據
 					}
 
 					// --------------------- iir_bandpass_filter_1 --------------------- 
+					double y[799] = {0};  // 完成濾波後的輸出，訊號與輸入前等長
 					//  def zpk2tf(z, p, k):
 					//  if (order == 5) => BR
-					double y[799] = {0};
+					// b & a: 對應呼吸心律的濾波參數設定
+					// delay: Initial conditions for the filter delays. It is a vector (or array of vectors for an N-dimensional input) of length max(len(a), len(b)) - 1.
 					if (br0hr1 == 0) {
 						double b[11] = {0.0003100856139325839, -0.0024503932074526414, 0.008191253474064738, -0.014462792713750464, 0.012602969766102465, 0.0, -0.012602969766102468, 0.01446279271375046, -0.008191253474064738, 0.0024503932074526414, -0.00031008561393258384};
 						double a[11] = {1., -9.780812442849507, 43.08317719449593, -112.54898060868825, 193.10308878043222, -227.3654181511635, 186.0550507759317, -104.48315327333019, 38.53588426508279, -8.42919504975534, 0.8303585098573365};
 						double delay[10] = {0}; // length of (a or b) - 1
 						size_t len_ab = sizeof(a) / sizeof(double);
-						double after_lifter[799] = {0};
 						lfilter(b, a, removed_noise, y, delay, len_ab, 799, 1, 1);
 					}
 
@@ -655,36 +708,37 @@ int main(void)
 						double a[19] = {1.0, -15.142612391789038, 109.52867216475022, -502.6626423702458, 1639.7914526180646, -4037.095860679349, 7772.407643496967, -11963.349399532222, 14922.878739349395, -15197.385490007382, 12665.576290591296, -8617.837327643654, 4751.9970631301, -2094.9246186588152, 722.2258948681153, -187.91289244221497, 34.75519411187606, -4.078772963228582, 0.22866640874033417};
 						double delay[18] = {0};  // length of (a or b) - 1
 						size_t len_ab = sizeof(a) / sizeof(double);
-						double after_lifter[799] = {0};
 						lfilter(b, a, removed_noise, y, delay, len_ab, 799, 1, 1);
 					}
 					
 					// --------------------- FFT --------------------- 
-					int N = 799;
-					double P[800];
+					int N = 799;  // FFT length & The number of samples
+					double P[800];  // Output signal(complex-value). The layout of elemens are: `nrows * ((fft_len / 2) + 1) * 2(real, img)
 					rfft_forward_1d_array(y, N, N, 1, 1, P);  // Output: y
 
 					// Find max value index in FFT
-					int max_index = 0;
-					double max = sqrt(pow(P[0], 2) + pow(P[0 + 1], 2));
+					int max_index = 0;  // 設定追蹤最大值的 index ，當發現新的最大值即更新
+					double max = sqrt(pow(P[0], 2) + pow(P[0 + 1], 2));  // 計算複數最大值，預設第一項為最大後續更新
 
+					// 遍歷所有頻域輸出，找出最大值為在的頻率，間隔設為 2 因為有實虛
 					for (int i = 0; i < 798; i += 2)
 					{
+						// 若當前值大於最大值則進行取代
 						if (sqrt(pow(P[i], 2) + pow(P[i + 1], 2)) > max)
 						{
-							max = sqrt(pow(P[i], 2) + pow(P[i + 1], 2));
-							max_index = i;
+							max = sqrt(pow(P[i], 2) + pow(P[i + 1], 2));  // 計算複數最大值
+							max_index = i;  // 更新追蹤最大值的 index
 						}
 					}
 					double index_of_fftmax = (max_index / 2) * 10.0 / (int)(N / 2);  // Output: index_of_fftmax
 
 					// --------------------- Smoothing signal --------------------- 
-					int smoothing_pars;
+					int smoothing_pars;  // Smoothing signal 所需的參數，製作以當前值向左右延伸 smoothing_pars 形成的窗格
 					if (br0hr1 == 0)
 						smoothing_pars = 2;
 					else
 						smoothing_pars = 2;
-					int len_input = sizeof(y) / sizeof(double);
+					int len_input = sizeof(y) / sizeof(double);  // 計算輸入資料長度
 					double *data_s = MLR(y, smoothing_pars, len_input);  // Output: data_s
 					
 					// --------------------- Feature_detection ---------------------
@@ -693,21 +747,19 @@ int main(void)
 
 					// Output peak
 					m_p = 0;  // Pointer to the end of valid area in allocated arrays
-					int midpoints_peak[len_s_half];
-					feature_peak = _local_maxima_1d(data_s, len_input, midpoints_peak, &m_p);  // Output: feature_peak
+					int midpoints_peak[len_s_half];  // 初始化空間給 Function
+					feature_peak = _local_maxima_1d(data_s, len_input, midpoints_peak, &m_p);  // Output: feature_peak ( 最大值集合 )
 
-					// Dynamic memory management for negative signals
+					// Reverse up-down array
 					for (int i = 0; i < len_input; i++)
-						neg_x[i] = -data_s[i];
+						neg_x[i] = -data_s[i];  // neg_x: 存放顛倒後的訊號，好以能夠重複使用 _local_maxima_1d 找出最小值
 
 					// Output valley
 					m_v = 0;  // Pointer to the end of valid area in allocated arrays
-					int midpoints_valley[len_s_half];
-					feature_valley = _local_maxima_1d(neg_x, len_input, midpoints_valley, &m_v);  // Output: feature_valley
+					int midpoints_valley[len_s_half];  // 初始化空間給 Function
+					feature_valley = _local_maxima_1d(neg_x, len_input, midpoints_valley, &m_v);  // Output: feature_valley ( 最小值集合 )
 					
 					// --------------------- Feature compress --------------------- 
-					// Initialize (feature_compress)
-
 					// Given value
 					for (int i = 0; i < m_p; i++)
 						total_feature[i] = feature_peak[i];
@@ -717,7 +769,7 @@ int main(void)
 					// Perform quicksort on data
 					quickSort(total_feature, 0, m_p + m_v - 1);
 					
-					// Compress parameter
+					// Compress parameter ( 呼吸: 22, 心律: 5 )
 					if (br0hr1 == 0)
 						time_thr = 22;
 					else
@@ -800,7 +852,6 @@ int main(void)
 							ltera = ltera_add;
 							
 						}
-
 						else {
 							// It is normal featur point
 							if (start_feature == 1){
@@ -820,7 +871,7 @@ int main(void)
 					
 					// --------------------- Feature sort --------------------- 
 
-					// Given value
+					// Given value ( 全部特徵放一起，後續對整個陣列做 Sort )
 					for (int i = 0; i < sum_p; i++)
 						compress_feature[i] = feature_compress_peak[i];
 					for (int i = 0; i < sum_v; i++)
@@ -830,30 +881,32 @@ int main(void)
 					quickSort(compress_feature, 0, sum_p + sum_v - 1);
 					
 					// --------------------- Candidate search --------------------- 
+					// Initialize (feature_compress)
 					double tmp_sum, window_sum, tmp_var, window_var;
 					int NT_index, NB_index;
 
-					// Doing the zero paddding
+					// 設定 Candidate search 所需的參數 ( window_size: 呼吸 = 17, 心律 = 4 )
 					int window_size;
 					if (br0hr1 == 0)
 						window_size = 17;
 					else
 						window_size = 4;
 
+					// Doing the zero paddding
 					for (int i = 0; i < len_input + (2 * window_size); i++){
 						if (i >= window_size && i < len_input + (2 * window_size) - window_size)
-							signal_pad[i] = data_s[i-window_size];
+							signal_pad[i] = data_s[i-window_size];  // paddding 中間
 						else
-							signal_pad[i] = 1;
+							signal_pad[i] = 1;  // 其餘 paddding 1
 					}
 					for (int i = 0; i < window_size; i++)
-						signal_pad[i] = data_s[0];
+						signal_pad[i] = data_s[0];  // paddding 前面
 					for (int i = len_input + (2 * window_size) - window_size; i < len_input + (2 * window_size) - 1; i++)
-						signal_pad[i] = data_s[len_input-1];
+						signal_pad[i] = data_s[len_input-1];  // paddding 後面
 
 					// Calaulate the mean and std using windows(for peaks)
-					NB_index = 0;
-					NT_index = 0;
+					NB_index = 0;  // 作為索引值同時也作為計算多少 Bottom features 的計數器
+					NT_index = 0;  // 作為索引值同時也作為計算多少 Top features 的計數器
 					for (int i = 0; i < sum_v+sum_p; i++){
 						// For the mean
 						tmp_sum = 0;
@@ -889,18 +942,18 @@ int main(void)
 					// If only NT are detected
 					else if (NT_index > 1 && NB_index <= 1){
 						for (int i = 1; i < NT_index; i++)
-							tmp_rate += NT_point[i] - NT_point[i-1];
-						rate = 1200 / (tmp_rate / (NT_index - 1));
+							tmp_rate += NT_point[i] - NT_point[i-1];  // 特徵區間內的間隔總和
+						rate = 1200 / (tmp_rate / (NT_index - 1));  // 特徵區間內的間隔總和除以區間個數 = 特徵平均距離 => 20(取樣頻率) * 60(秒) / 特徵平均距離
 					}
 
 					// If only NB are detected
 					else if (NT_index <= 1 && NB_index > 1){
 						for (int i = 1; i < NB_index; i++)
-							tmp_rate += NB_point[i] - NB_point[i-1];
-						rate = 1200 / (tmp_rate / (NB_index - 1));
+							tmp_rate += NB_point[i] - NB_point[i-1];  // 特徵區間內的間隔總和
+						rate = 1200 / (tmp_rate / (NB_index - 1));  // 特徵區間內的間隔總和除以區間個數 = 特徵平均距離 => 20(取樣頻率) * 60(秒) / 特徵平均距離
 					}
 
-					// If both NT and NB are detected
+					// If both NT and NB are detected  ( 做法與上述相同但分開計算 )
 					else {
 						for (int i = 1; i < NT_index; i++)
 							tmp_rate += NT_point[i] - NT_point[i-1];
@@ -912,6 +965,7 @@ int main(void)
 						rate = 1200 / (cur_rate / 2);
 					}
 
+					// The SVM classifier determines whether to use TI output or Ours algorithm output (0: Ours, 1: TI).
 					svm_input[0] = index_of_fftmax;
 					if (br0hr1 == 0){
 						svm_input[1] = br_mean_FFT;
@@ -934,6 +988,7 @@ int main(void)
 					}
 				}
 
+				// 判斷雷達前是否有人存在 ( 若無人則以 0 取代呼吸律與心律 )
 				double thr_br = 0;
 				double thr_hr = 0;
 				mean_fn_double(current_window_ebr, eng_index, &thr_br);
@@ -943,6 +998,8 @@ int main(void)
 					hr_rate = 0;
 				}
 				printf("br_rate = %f\nhr_rate = %f\n", br_rate, hr_rate);
+
+				// 寫入 logs 檔案
 				FILE *fp = fopen(filename, "a");
 				if (fp == NULL)
 				{

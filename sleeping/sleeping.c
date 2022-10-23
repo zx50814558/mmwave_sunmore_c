@@ -45,12 +45,15 @@ double LF_HF_LFHF_windows[6100];  // raw_sig[-5*60*20:]
 int svm_result;
 double svm_input[3];
 
-
+/*
+input: Input Signal
+delta: The length of the window pane extending from left to right.
+len_: The length of the input data.*/
 double *MLR(double *input, int delta, int len_)
 {
-	double *data_s = input;
+	double *data_s = input;  // Get input signal.
 
-	// Dynamic memory management
+	// Create a zero array.
 	double mean_ptr[799] = {0};
 	double m_ptr[799] = {0};
 	double b_ptr[799] = {0};
@@ -70,10 +73,14 @@ double *MLR(double *input, int delta, int len_)
 		{
 			int star = t - delta;
 			int end = t + delta + 1;
+
+			// Calculates the average in the windows.
 			double mean_tmp = 0;
 			for (int j = 0; j < end - star; j++)
 				mean_tmp += input[star + j];
 			mean_ptr[t] = (mean_tmp / (end - star));
+
+			// Slope & bias
 			double mtmp = 0;
 			for (int i = -delta; i < delta + 1; i++)
 				mtmp += i * (input[t + i] - mean_ptr[t]);
@@ -90,19 +97,24 @@ double *MLR(double *input, int delta, int len_)
 			double tmp_s = 0;
 			for (int i = t - delta; i < t + delta; i++)
 			{
-				tmp_s += (m_ptr[i] * t) + b_ptr[i];
+				tmp_s += (m_ptr[i] * t) + b_ptr[i];  // y = mt + b
 			}
-			data_s[t] = tmp_s / (2 * delta + 1);
+			data_s[t] = tmp_s / (2 * delta + 1);  // mean
 		}
 	}
 
 	return data_s;
 }
 
+/*
+x: Input Signal
+len_s: The input length of the signal is smoothed and s is added to the end.
+midpoints: An incoming array of pointer for returning values
+m: A pointer to record the number of local maxima features.*/
 int *_local_maxima_1d(double *x, int len_s, int *midpoints, int *m)
 {
 
-	// Dynamic memory management
+	// Create a zero array.
 	int left_edges[400] = {0};  // default 399
 	int right_edges[400] = {0};  // default 399
 	int i_ahead = 0;
@@ -183,6 +195,9 @@ int partition(int array[], int low, int high)
 	return (i + 1);
 }
 
+// array: Input array
+// low: The lower bound of the Sort algorithm.
+// high: The upper bound of the Sort algorithm.
 void quickSort(int array[], int low, int high)
 {
 	if (low < high)
@@ -202,6 +217,17 @@ void quickSort(int array[], int low, int high)
 }
 /* ----------- QuickSort (End) ----------- */
 
+/*
+b: The numerator coefficient vector in a 1-D sequence.
+a: The denominator coefficient vector in a 1-D sequence.
+x: An N-dimensional input array.
+y: The output of the digital filter.
+Z: Initial conditions for the filter delays.
+len_b: length of a and b.
+len_x: length of input array.
+stride_X: default = 1
+stride_Y: default = 1
+*/
 static void lfilter(double *b, double *a, double *x, double *y, double *Z, int len_b, uint32_t len_x, int stride_X, int stride_Y)
 {
 
@@ -300,7 +326,7 @@ void array_shift()
 	}
 }
 
-// 當呼吸律或心律為異常值, 以前一秒的輸出值取代。1 = BR 0 = HR
+// When the respiratory rhythm or heart rhythm is anomalous, it is replaced by the previous second's output value. 1 = BR 0 = HR.
 double substitute(double pre, double input, int result_type){
 	if (result_type == 0){
 		if (input < 40 || input > 110)
@@ -317,30 +343,32 @@ double substitute(double pre, double input, int result_type){
 }
 
 // Sleeping features function
+// raw_sig: Input array
+// percent: return output
 void mov_dens_fn(double *raw_sig, double *percent){
+	// Declare and initialize the variables.
     int x_index;
     double tmp_x, tmp_top, x_mean, result;
     double count = 0;
     double x[4] = {0};
-    double top[4] = {0};
-    
+    // Segments with 0.5s length = 80 Segments
     for (int num = 0; num < 120; num++){
         x_mean = 0;
         x_index = 0;
         result = 0;
         for (int index = num*4; index < (num+1)*4; index++){
-            tmp_x = round(raw_sig[index] * 100000000) / 100000000;
-            x[x_index] = tmp_x;
-            x_mean += tmp_x;
-            x_index++;
+            tmp_x = round(raw_sig[index] * 100000000) / 100000000;  // Rounded to the ninth decimal place.
+            x[x_index] = tmp_x;  // The algorithm is divided into 4 times into x-array columns.
+            x_mean += tmp_x;  // Calculated average. ( Sum )
+            x_index++;  // Update the location of the next input stored in the x array.
         }
-        x_mean = x_mean / 4;
+        x_mean = x_mean / 4;  // Calculated average. ( Division )
         for (int i = 0; i < 4; i++){
-            tmp_top = pow(x[i] - x_mean, 2);
-            top[i] = tmp_top;
-            result += tmp_top;
+            tmp_top = pow(x[i] - x_mean, 2);  // x[i] Subtract the mean value of x and square it.
+            result += tmp_top;  // Sum the result.
         }
-        result = result / 3;
+        result = result / 3;  // Divided by the interval.
+		// 0.045 is adjustable valve value.
         if (result > 0.045)
             count++;
     }
@@ -348,20 +376,25 @@ void mov_dens_fn(double *raw_sig, double *percent){
 }
 
 // tfRSA_fn(intput, output)
-//> intput = array
-//> output = features
+// Compute the standard deviation along the specified axis.
+// Returns the standard deviation, a measure of the spread of a distribution, of the array elements. The standard deviation is computed for the flattened array by default, otherwise over the specified axis.
+// intput = array
+// output = features
 void tfRSA_fn(double *fRSA_sig, double *tfRSA){
     double sum = 0.0, mean, SD = 0.0;
+	// Calculated average
     for (int i = 0; i < 10; ++i) {
         sum += fRSA_sig[i];
     }
     mean = sum / 10;
+	// Compute the standard deviation
     for (int i = 0; i < 10; ++i) {
         SD += pow(fRSA_sig[i] - mean, 2);
     }
     *tfRSA = sqrt(SD / 10);
 }
 
+// Do the convolve
 void convolve(double *h, double *x, int lenH, int lenX, double *output)
 {
     int nconv = lenH+lenX-1;
@@ -379,8 +412,15 @@ void convolve(double *h, double *x, int lenH, int lenX, double *output)
         output[i] = y[i + start_index];
 }
 
+// Apply a Savitzky-Golay filter to an array.
 // Only supple window_length = 31 and polyorder == (2 or 3)
+// x: The data to be filtered.
+// window_length: The length of the filter window (i.e., the number of coefficients)
+// polyorder: The order of the polynomial used to fit the samples. polyorder must be less than window_length.
+// input_mean: Return the average of the output.
+// y: Return the output signal.
 void savgol_filter(double *x, int window_length, int polyorder, double *input_mean, double *y) {
+	// Different SG filter parameters are set according to the different filter parameters.
     double conv_y[100] = {0};
     double coeffs_2[] = {-0.041055718475071855, -0.026392961876831954, -0.012741429871574048, -0.00010112245929822615, 0.011527960359995528, 0.02214581858630722, 0.031752452219636844, 0.04034786125998441, 0.0479320457073499, 0.05450500556173333, 0.060066740823134686, 0.06461725149155399, 0.06815653756699122, 0.07068459904944638, 0.07220143593891949, 0.0727070482354105, 0.07220143593891949, 0.07068459904944638, 0.06815653756699123, 0.06461725149155399, 0.06006674082313469, 0.05450500556173333, 0.04793204570734991, 0.040347861259984415, 0.03175245221963685, 0.022145818586307226, 0.01152796035999553, -0.00010112245929822268, -0.012741429871574055, -0.02639296187683194, -0.04105571847507189};
     double coeffs_3[] = {-0.04105571847507182, -0.02639296187683192, -0.012741429871574027, -0.00010112245929820307, 0.011527960359995546, 0.022145818586307233, 0.03175245221963686, 0.040347861259984415, 0.0479320457073499, 0.054505005561733336, 0.060066740823134686, 0.06461725149155399, 0.06815653756699121, 0.07068459904944636, 0.07220143593891948, 0.07270704823541049, 0.07220143593891948, 0.07068459904944638, 0.06815653756699121, 0.06461725149155398, 0.06006674082313469, 0.05450500556173333, 0.04793204570734991, 0.040347861259984415, 0.03175245221963686, 0.022145818586307237, 0.01152796035999555, -0.0001011224592981996, -0.012741429871574027, -0.026392961876831905, -0.041055718475071855};
@@ -427,15 +467,18 @@ void savgol_filter(double *x, int window_length, int polyorder, double *input_me
     *input_mean = *input_mean  / 31;
 }
 
+// sig: Input array
+// output: Output array
 void var_RPM(double *sig, double *output) {
+	// Calculated average.
     double rk_mean = 0;
     for (int i = 0; i < 600; i++)
         rk_mean += sig[i];
     rk_mean = rk_mean / 600;
 
+	// Calculate var_RPM
     double tmp_mean;
     double tmp_output = 0;
-    double brhr_mins[10] = {0};
     for (int i = 0; i < 10; i++) {
         tmp_mean = 0;
         for (int j = 0; j < 60; j++)
@@ -445,14 +488,17 @@ void var_RPM(double *sig, double *output) {
     *output = tmp_output / 9;
 }
 
+// sig: Input array
+// output: Output array
 void bmi(double *sig, double *output) {
     double ak_array[6] = {0};
-    
+	// The average of first 10 data are taken as the minimum value first.
     double ak_min = 0;
     for (int i = 0; i < 10; i++)
         ak_min += sig[i];
     ak_min = ak_min / 10;
 
+	// Find the smallest Ak(i).
     double ak;
     for (int i = 0; i < 6; i++) {
         ak = 0;
@@ -465,20 +511,28 @@ void bmi(double *sig, double *output) {
             ak_min = ak;
     }
 
+	// BI(k)
     double result = 0;
     for (int i = 0; i < 6; i++)
         result += ak_array[i] - ak_min;
     *output = result;
 }
 
+// bi: Input1
+// h: Input2
+// output: Output
 void deep_parameter(double bi, double h, double *output) {
     *output = bi / (h + bi);
 }
 
+// Calculate the time difference between the current time and 8:00 PM and convert it into seconds.
 void time_fn (int hours, int minutes, int seconds, int *time_featres) {
     *time_featres = (hours + 24 - 20) * 3600 + minutes * 60 + seconds;
 }
 
+// Each segment is 60 seconds, so there are 60 respiration rates. The 60 respiration rates are divided into the first 30 and the last 30 for calculation.
+// sig: Input array
+// output: Output
 void rem_parameter(double *sig, double *output)
 {
     double former;
@@ -514,32 +568,37 @@ void mean_fn_int (int *sig, int sig_len, double *output_i)
 
 int main(void)
 {
+	// Create a file of recorded data and enter the first row as the name of each feature.
     char filename[100] = {0};
     char input_name[100];
     char *input_n;
-    char *root_dir = "dataset/"; // 改檔名
-    printf("Input file name = ");
+    char *root_dir = "dataset/";  // Root directory of data.
+    printf("Input file name = ");  // Enter the file name (without the .csv) ex: example.
     input_n = fgets(input_name, 100, stdin);
     input_n[strcspn(input_n, "\r\n")] = 0;
-    strcat(filename, root_dir);
-    strcat(filename, input_name);
-    strcat(filename, ".csv");
-    FILE *fp = fopen(filename, "w");
+    strcat(filename, root_dir);  // Concatenate two strings.
+    strcat(filename, input_name);  // Concatenate two strings.
+    strcat(filename, ".csv");  // Concatenate two strings.
+    FILE *fp = fopen(filename, "w");  // Open the file and set it to write mode.
     if (fp == NULL)
     {
         printf("error");
         return -1;
     }
+	// Write the name of each output value to the first row of the file.
 	fprintf(fp, "heart, breath, bmi, deep_p, ada_br, ada_hr, var_RPM, var_HPM, rem_parameter, mov_dens, LF, HF, LFHF, sHF, sLFHF, tfRSA, tmHR, sfRSA, smHR, sdfRSA, sdmHR, stfRSA, stmHR, time, datetime, sleep\n");
 	fclose(fp);
-	int len_s_half;
-	int *feature_peak, *feature_valley;
-	int m_p, m_v; // Number of peak & valley
-	double neg_x[799] = {0};
+
+	// Initialize (Feature_detection)
+	int len_s_half;  // Signal length and half length.
+	int *feature_peak, *feature_valley;  // Output peak and valley.
+	int m_p, m_v; // Number of peak & valley.
+	double neg_x[799] = {0};  // The value of the storage signal multiplied by the negative sign.
 
 	// Initialize (feature_compress)
-	int start_feature, end_feature, ltera_add, time_thr;
-	int location, ltera, sum_v, sum_p;
+	int start_feature, end_feature;  // Find the first and last feature after the feature_detection is done is peak or valley.
+	int ltera_add, location, ltera, time_thr;  // Record the number of rounds and the declaration threshold.
+	int sum_v, sum_p;  // Record how many peaks and valleys remain after compress is completed.
 
     int serial_port = open("/dev/ttyTHS1", O_RDWR);
 	struct termios tty;
@@ -585,8 +644,8 @@ int main(void)
 	unsigned int vsos_byte[128];
 	unsigned int tlv_header[4];
 	short int rangeProfile[2];
-	float vsos_array[34];			   //主要輸出1
-	short int rangeProfile_array[126]; //主要輸出2
+	float vsos_array[34];  // Main output 1
+	short int rangeProfile_array[126];  // Main output 2
 	short int int16_number;
 	int i = 0;
 	int j = 0;
@@ -596,7 +655,7 @@ int main(void)
 	unsigned int int16_temp[16];
 	int magicWord[8] = {2, 1, 4, 3, 6, 5, 8, 7};
 
-	//讀值之後的變數
+    // Declare the variable after the completion of reading.
 	time_t start_time;
 	start_time = time(NULL);
 	int array_index = 0;
@@ -607,7 +666,7 @@ int main(void)
 	float hr_mean_FFT, hr_mean_xCorr, br_mean_FFT, br_mean_xCorr, breath_mean_ti, heart_mean_ti;
 	float thr;
 
-	// 動態記憶體
+    // Configure the storage space.
 	int total_feature[800] = {0};
 	int feature_compress_valley[800] = {0};
 	int feature_compress_peak[800] = {0};
@@ -616,7 +675,7 @@ int main(void)
 	int NB_point[800] = {0};
 	double signal_pad[1600] = {0};
 
-	// 最終生理資訊
+	// Declare the physiological information output after the completion of the algorithm.
 	double final_hr, final_br, final_hr_sub, final_br_sub, br_rpm, hr_rpm;
 	double tmp_br = 0;
 	double tmp_hr = 0;
@@ -624,7 +683,7 @@ int main(void)
 	// Time data
 	int hours, minutes, seconds, day, month, year;
 	time_t now;
-	int start_time_sec, start_day, start_month, start_year;
+	int start_day, start_month, start_year;
 	int next_YMD = 0;
 
 	// Start record feature
@@ -717,7 +776,7 @@ int main(void)
 	double sLFHF_ar[60] = {0};
 	int sHF_index = 0;
 
-	// 睡眠階段 (Paper2)
+	// Sleep stage algorithm. (Paper2)
 	// Features (Variance of RPM)
 	int var_RPM_index = 0;
 	double var_RPM_br = 0;
@@ -768,17 +827,17 @@ int main(void)
 
 	time(&now);
 	struct tm *local = localtime(&now);
-	hours = local->tm_hour;         // 獲取自午夜以來的小時數 (0-23)
-    minutes = local->tm_min;        // 獲取小時後經過的分鐘數 (0-59)
-    seconds = local->tm_sec;        // 獲取一分鐘後經過的秒數 (0-59)
-	start_time_sec = seconds + minutes * 60 + hours * 3600;
-    start_day = local->tm_mday;            // 獲取月份中的日期(1 到 31)
-    start_month = local->tm_mon + 1;      // 獲取一年中的月份(0 到 11)
-    start_year = local->tm_year + 1900;   // 獲取自 1900 年以來的年份
+	hours = local->tm_hour;    // Obtained from the hours since midnight (0-23)
+    minutes = local->tm_min;    // Get the number of minutes elapsed after the hour (0-59)
+    seconds = local->tm_sec;    // Get the number of seconds elapsed after one minute (0-59)
+    start_day = local->tm_mday;    // Get the date in the month (1-31)
+    start_month = local->tm_mon + 1;    // Get the month of the year (0-11)
+    start_year = local->tm_year + 1900;    // The year was taken from 1900 onwards.
 	
-
+    // Execute the algorithm uninterrupted until Ctrl + C is pressed.
 	while (1)
 	{
+        // Reads data from the radar.
 		while ((size = read(serial_port, &read_buf, sizeof(read_buf) - 1)) > 0)
 		{
 			// printf("----------start-----------\n");
@@ -893,9 +952,11 @@ int main(void)
 			break;
 		}
 
-		// Reading data
-		time_t end_time;
-		end_time = time(NULL);
+		// Reads data without interruption.
+		time_t end_time;  // Declare time variables.
+		end_time = time(NULL);  // Set the time variable to the current time.
+
+		// When the number of data read is less than 800, the following equation is executed to read the data into the corresponding array step by step.
 		if (array_index < 800) {
 			unwrapPhasePeak_mm[array_index] = (double)vsos_array[7];
 			heartRateEst_FFT_mean[array_index] = (double)vsos_array[10];
@@ -907,6 +968,8 @@ int main(void)
 		}
 
         // current_window_bmi
+		// To generate this feature, 1200 data are used, so the data are read here step by step, 
+		// and when the number of data exceeds 1200, the elements of the array are left-shifted and the latest value read is placed at the end of the array.
         if (array_index_bmi < 1200) {
             current_window_bmi[array_index_bmi] = (double)vsos_array[7];
 			array_index_bmi++;
@@ -918,6 +981,8 @@ int main(void)
         }
 
         // LF_HF_LFHF_windows
+		// To generate this feature, 6000 data are used, so the data are read here step by step, 
+		// and when the number of data exceeds 6000, the elements of the array are left-shifted and the latest value read is placed at the end of the array.
         if (array_index < 6000) {
             LF_HF_LFHF_windows[array_index] = (double)vsos_array[7];
             array_index++;
@@ -928,51 +993,55 @@ int main(void)
             LF_HF_LFHF_windows[5999] = (double)vsos_array[7];
         }
 
-        // Main
+        // When the number of read data reaches 800 or more, the sleep stage of the algorithm starts.
 		if (array_index >= 800) {
 			// Array shift
-			array_shift();
-			unwrapPhasePeak_mm[799] = (double)vsos_array[7];
-			heartRateEst_FFT_mean[799] = (double)vsos_array[10];
-			heartRateEst_xCorr_mean[799] = (double)vsos_array[12];
-			breathingEst_FFT_mean[799] = (double)vsos_array[14];
-			breathingEst_xCorr_mean[799] = (double)vsos_array[15];
-			breath_ti[799] = (double)vsos_array[25];
-			heart_ti[799] = (double)vsos_array[26];
+			// To ensure that the subsequent panes are all 800 in size we use "array_shift" fuction at the beginning 
+			// to shift the array to the left and put the new value at the end of the array.
+			if (array_index != 800) {
+				array_shift();
+				unwrapPhasePeak_mm[799] = (double)vsos_array[7];
+				heartRateEst_FFT_mean[799] = (double)vsos_array[10];
+				heartRateEst_xCorr_mean[799] = (double)vsos_array[12];
+				breathingEst_FFT_mean[799] = (double)vsos_array[14];
+				breathingEst_xCorr_mean[799] = (double)vsos_array[15];
+				breath_ti[799] = (double)vsos_array[25];
+				heart_ti[799] = (double)vsos_array[26];
+			}
 
 			// Setting time (initial)
-			time(&now);
-			struct tm *local = localtime(&now);
-			hours = local->tm_hour;         // 獲取自午夜以來的小時數 (0-23)
-			minutes = local->tm_min;        // 獲取小時後經過的分鐘數 (0-59)
-			seconds = local->tm_sec;        // 獲取一分鐘後經過的秒數 (0-59)
-			day = local->tm_mday;            // 獲取月份中的日期(1 到 31)
-			month = local->tm_mon + 1;      // 獲取一年中的月份(0 到 11)
-			year = local->tm_year + 1900;   // 獲取自 1900 年以來的年份
+			// Set the current time to subsequently run the algorithm at a frequency that updates every second.
+			time(&now);  // Get the current time.
+			struct tm *local = localtime(&now);  // Get the current time.
+			hours = local->tm_hour;  // The hours (0 to 23) are taken from midnight onwards.
+			minutes = local->tm_min;  // Get the number of minutes elapsed after the hour (0 to 59).
+			seconds = local->tm_sec;  // Get the number of seconds elapsed after one minute (0 to 59).
+			day = local->tm_mday;  // Get the date in the month (1 to 31).
+			month = local->tm_mon + 1;  // Get the month of the year (0 to 11).
+			year = local->tm_year + 1900;  // The year was taken from 1900 onwards.
 			
 			// Setting time (define)
+			// Special situation! When changing the year, month and day, we need to consider that the total number of seconds will be reset.
 			if (year - start_year >= 1){
-				start_year = year;
-				start_month = month;
-				start_day = day;
-				start_time_sec = seconds+minutes*60+hours*3600;
-				next_YMD = 1;
+				start_year = year;  // Year reset.
+				start_month = month;  // Month reset.
+				start_day = day;  // Day reset.
+				next_YMD = 1;  // Switch (0: normal case, 1: special case)
 			}
 			else if (month - start_month >= 1){
-				start_month = month;
-				start_day = day;
-				start_time_sec = seconds+minutes*60+hours*3600;
-				next_YMD = 1;
+				start_month = month;  // Month reset.
+				start_day = day;  // Day reset.
+				next_YMD = 1;  // Switch (0: normal case, 1: special case)
 			}
 			else if (day - start_day >= 1){
-				start_day = day;
-				start_time_sec = seconds+minutes*60+hours*3600;
-				next_YMD = 1;
+				start_day = day;  // Day reset.
+				next_YMD = 1;  // Switch (0: normal case, 1: special case)
 			}
 
+			// When the second is updated or there are special circumstances, the sequential algorithm is executed.
 			if (end_time - start_time >= 1 || next_YMD == 1)
 			{
-                
+                // Reset the switch for special cases.
 				next_YMD = 0;
 
                 // Reset average parameters
@@ -1001,35 +1070,41 @@ int main(void)
 
 				/* ---------------------------- Breath Heart ---------------------------- */
 				// --------------------- Phase_difference --------------------- 
-				size_t len_unwrapPhasePeak_mm = sizeof(unwrapPhasePeak_mm) / sizeof(unwrapPhasePeak_mm[0]);
+				size_t len_unwrapPhasePeak_mm = sizeof(unwrapPhasePeak_mm) / sizeof(unwrapPhasePeak_mm[0]);  // Calculates the length of unwrapPhasePeak_mm.
+				// The last item of the signal is subtracted from the previous one to get the signal with phase difference.
 				for (int num = 1; num < len_unwrapPhasePeak_mm; num++)
 				{
 					phase_diff[num - 1] = unwrapPhasePeak_mm[num] - unwrapPhasePeak_mm[num - 1];
 				}
 
-				// For breathing heartbeat loop
+				// For breathing heartbeat loop (0: respiratory, 1: cardiac rhythm)
+				// The respiratory and cardiac rhythm programs are the same, but the parameters within the algorithm are set differently. 
+				// Therefore, the algorithms for respiratory and cardiac rhythm are run separately by for loops, 
+				// and the corresponding parameters are taken internally by the algorithm with a if else manner.
 				for (int br0hr1 = 0; br0hr1 < 2; br0hr1++){
-
 					// Remove_impulse_noise
-					size_t len_phase_diff = sizeof(phase_diff) / sizeof(phase_diff[0]);
+					size_t len_phase_diff = sizeof(phase_diff) / sizeof(phase_diff[0]);  // Calculates the length of Phase_difference.
 					if (br0hr1 == 0)
-						thr = 1.5;
+						thr = 1.5;  // The impulse_noise threshold for respiratory.
 					else
-						thr = 1.5;
+						thr = 1.5;  // The impulse_noise threshold for cardiac.
+					// The entire signal is processed in a sliding windows of windows size three. The beginning and the end do not need to be dealt with.
 					for (int num = 1; num < len_phase_diff - 1; num++)
 					{
-						forward = phase_diff[num] - phase_diff[num - 1];
-						backward = phase_diff[num] - phase_diff[num + 1];
+						forward = phase_diff[num] - phase_diff[num - 1];  // The center of the windows minus the previous element.
+						backward = phase_diff[num] - phase_diff[num + 1];  // The center of the windows minus the last  element.
+						// Replace when forward and backward exceed the set threshold.
 						if ((forward > thr && backward > thr) || (forward < -thr && backward < -thr))
 						{
 							// printf("%f\n", phase_diff[num-1] + (phase_diff[num+1] -  phase_diff[num-1])/2);
-							removed_noise[num] = (double)phase_diff[num - 1] + (double)(phase_diff[num + 1] - (double)phase_diff[num - 1]) / 2;
+							removed_noise[num] = (double)phase_diff[num - 1] + (double)(phase_diff[num + 1] - (double)phase_diff[num - 1]) / 2;  // Replaces the original element with a new one.
 						}
-						removed_noise[num] = (double)phase_diff[num];
+						removed_noise[num] = (double)phase_diff[num];  // If the forward and backward boundaries are within the range, there is no need to deal with them and the original signal is used.
 					}
 
 					// --------------------- iir_bandpass_filter_1 --------------------- 
 					//  def zpk2tf(z, p, k):
+					// Filtering of the signal with iir bandpass filter by selected parameters.
 					//  if (order == 5) => BR
 					double y[799] = {0};
 					if (br0hr1 == 0) {
@@ -1037,7 +1112,6 @@ int main(void)
 						double a[11] = {1., -9.780812442849507, 43.08317719449593, -112.54898060868825, 193.10308878043222, -227.3654181511635, 186.0550507759317, -104.48315327333019, 38.53588426508279, -8.42919504975534, 0.8303585098573365};
 						double delay[10] = {0}; // length of (a or b) - 1
 						size_t len_ab = sizeof(a) / sizeof(double);
-						double after_lifter[799] = {0};
 						lfilter(b, a, removed_noise, y, delay, len_ab, 799, 1, 1);
 					}
 
@@ -1047,60 +1121,61 @@ int main(void)
 						double a[19] = {1.0, -15.142612391789038, 109.52867216475022, -502.6626423702458, 1639.7914526180646, -4037.095860679349, 7772.407643496967, -11963.349399532222, 14922.878739349395, -15197.385490007382, 12665.576290591296, -8617.837327643654, 4751.9970631301, -2094.9246186588152, 722.2258948681153, -187.91289244221497, 34.75519411187606, -4.078772963228582, 0.22866640874033417};
 						double delay[18] = {0};  // length of (a or b) - 1
 						size_t len_ab = sizeof(a) / sizeof(double);
-						double after_lifter[799] = {0};
 						lfilter(b, a, removed_noise, y, delay, len_ab, 799, 1, 1);
 					}
 					
 					// --------------------- FFT --------------------- 
-					int N = 799;
-					double P[800];
+					int N = 799;  // FFT length & The number of samples
+					double P[800];  // Output signal(complex-value). The layout of elemens are: `nrows * ((fft_len / 2) + 1) * 2(real, img)
 					rfft_forward_1d_array(y, N, N, 1, 1, P);  // Output: y
 
 					// Find max value index in FFT
 					int max_index = 0;
-					double max = sqrt(pow(P[0], 2) + pow(P[0 + 1], 2));
-
+					// To calculate the amplitude of the frequency domain, square the real part and the imaginary part and then add them together.
+					double max = sqrt(pow(P[0], 2) + pow(P[0 + 1], 2));  // The first item is presumed to be the largest.
+					// The frequency with the highest amplitude is found by looping.
 					for (int i = 0; i < 798; i += 2)
 					{
+						// If the current frequency range amplitude is larger than the previous frequency range amplitude, it is replaced.
 						if (sqrt(pow(P[i], 2) + pow(P[i + 1], 2)) > max)
 						{
-							max = sqrt(pow(P[i], 2) + pow(P[i + 1], 2));
-							max_index = i;
+							max = sqrt(pow(P[i], 2) + pow(P[i + 1], 2));  // Update the maximum frequency domain amplitude.
+							max_index = i;  // Update the maximum frequency index value.
 						}
 					}
 					double index_of_fftmax = (max_index / 2) * 10.0 / (int)(N / 2);  // Output: index_of_fftmax
 
 					// --------------------- Smoothing signal --------------------- 
-					int smoothing_pars;
+					int smoothing_pars;  // Declares the parameters used by the Smoothing signal.
 					if (br0hr1 == 0)
-						smoothing_pars = 2;
+						smoothing_pars = 2;  // The Smoothing signal parameters for respiratory.
 					else
-						smoothing_pars = 2;
-					int len_input = sizeof(y) / sizeof(double);
+						smoothing_pars = 2;  // The Smoothing signal parameters for cardiac.
+					int len_input = sizeof(y) / sizeof(double);  // Calculate the length of the signal after filtering.
 					double *data_s = MLR(y, smoothing_pars, len_input);  // Output: data_s
 					
 					// --------------------- Feature_detection ---------------------
-					// Signal length and half length
+					// Signal length and half length, round down to the nearest whole number.
 					len_s_half = floor(len_input / 2);
 
 					// Output peak
 					m_p = 0;  // Pointer to the end of valid area in allocated arrays
-					int midpoints_peak[len_s_half];
+					int midpoints_peak[len_s_half];  // Create a space for the return of function. ( peak )
 					feature_peak = _local_maxima_1d(data_s, len_input, midpoints_peak, &m_p);  // Output: feature_peak
 
-					// Dynamic memory management for negative signals
+					// Generate the negative signal.
 					for (int i = 0; i < len_input; i++)
-						neg_x[i] = -data_s[i];
+						neg_x[i] = -data_s[i];  // Store the negative signal so that _local_maxima_1d can be reused and the minimum value can be found.
 
 					// Output valley
 					m_v = 0;  // Pointer to the end of valid area in allocated arrays
-					int midpoints_valley[len_s_half];
+					int midpoints_valley[len_s_half];  // Create a space for the return of function. ( valley )
 					feature_valley = _local_maxima_1d(neg_x, len_input, midpoints_valley, &m_v);  // Output: feature_valley
 					
 					// --------------------- Feature compress --------------------- 
-					// Initialize (feature_compress)
-
 					// Given value
+					// m_p and m_v are calculations of how many peak features and valley features were found after Feature_detection.
+					// Store all features (peaks & valleys) into another array total_feature.
 					for (int i = 0; i < m_p; i++)
 						total_feature[i] = feature_peak[i];
 					for (int i = 0; i < m_v; i++)
@@ -1111,9 +1186,9 @@ int main(void)
 					
 					// Compress parameter
 					if (br0hr1 == 0)
-						time_thr = 22;
+						time_thr = 22;  // The Feature compress parameters for respiratory.
 					else
-						time_thr = 5;
+						time_thr = 5;  // The Feature compress parameters for cardiac.
 					ltera = 0;
 					sum_v = 0;
 					sum_p = 0;
@@ -1213,39 +1288,43 @@ int main(void)
 					// --------------------- Feature sort --------------------- 
 
 					// Given value
+					// sum_p and sum_v are calculations of how many peak features and valley features were found after Feature compress.
 					for (int i = 0; i < sum_p; i++)
-						compress_feature[i] = feature_compress_peak[i];
+						compress_feature[i] = feature_compress_peak[i];  // Peak features that after Feature compress.
 					for (int i = 0; i < sum_v; i++)
-						compress_feature[sum_p+i] = feature_compress_valley[i];
+						compress_feature[sum_p+i] = feature_compress_valley[i];  // valley features that after Feature compress.
 					
 					// Perform quicksort on data
 					quickSort(compress_feature, 0, sum_p + sum_v - 1);
 					
 					// --------------------- Candidate search --------------------- 
+					// Initialize (feature_compress)
 					double tmp_sum, window_sum, tmp_var, window_var;
 					int NT_index, NB_index;
 
 					// Doing the zero paddding
 					int window_size;
 					if (br0hr1 == 0)
-						window_size = 17;
+						window_size = 17;  // The Feature compress parameters for respiratory.
 					else
-						window_size = 4;
-
+						window_size = 4;  // The Feature compress parameters for cardiac.
+					// Copy the smoothed signal to the new signal_pad array and set the rest of the positions to 1.
 					for (int i = 0; i < len_input + (2 * window_size); i++){
 						if (i >= window_size && i < len_input + (2 * window_size) - window_size)
 							signal_pad[i] = data_s[i-window_size];
 						else
 							signal_pad[i] = 1;
 					}
+					// The value of the first part of signal_pad is changed to the first item of the signal after smoothing.
 					for (int i = 0; i < window_size; i++)
 						signal_pad[i] = data_s[0];
+					// The value after signal_pad is changed to the last item of the signal after smoothing.
 					for (int i = len_input + (2 * window_size) - window_size; i < len_input + (2 * window_size) - 1; i++)
 						signal_pad[i] = data_s[len_input-1];
 
 					// Calaulate the mean and std using windows(for peaks)
-					NB_index = 0;
-					NT_index = 0;
+					NB_index = 0;  // It is used as an index value and also as a counter for calculating how many bottom features.
+					NT_index = 0;  // It is used as an index value and also as a counter for calculating how many top features.
 					for (int i = 0; i < sum_v+sum_p; i++){
 						// For the mean
 						tmp_sum = 0;
@@ -1269,7 +1348,8 @@ int main(void)
 							NB_index += 1;
 						}
 					}
-					// --------------------- Caculate breath rate --------------------- 
+					// --------------------- Caculate respiratory rate & cardiac rate --------------------- 
+					// Declare the parameters related to respiratory rate and cardiac rate.
 					double rate, cur_rate, tmp_rate;
 					rate = 0;
 					cur_rate = 0;
@@ -1281,18 +1361,22 @@ int main(void)
 					// If only NT are detected
 					else if (NT_index > 1 && NB_index <= 1){
 						for (int i = 1; i < NT_index; i++)
-							tmp_rate += NT_point[i] - NT_point[i-1];
+							tmp_rate += NT_point[i] - NT_point[i-1];  // The sum of the intervals within the featured interval.
+						// The sum of intervals within the featured interval divided by 
+						// the number of intervals = the average distance of the featured interval => 20(sampling frequency) * 60(seconds) / average distance of the featured interval.
 						rate = 1200 / (tmp_rate / (NT_index - 1));
 					}
 
 					// If only NB are detected
 					else if (NT_index <= 1 && NB_index > 1){
 						for (int i = 1; i < NB_index; i++)
-							tmp_rate += NB_point[i] - NB_point[i-1];
+							tmp_rate += NB_point[i] - NB_point[i-1];  // The sum of the intervals within the featured interval.
+						// The sum of intervals within the featured interval divided by 
+						// the number of intervals = the average distance of the featured interval => 20(sampling frequency) * 60(seconds) / average distance of the featured interval.
 						rate = 1200 / (tmp_rate / (NB_index - 1));
 					}
 
-					// If both NT and NB are detected
+					// If both NT and NB are detected  ( The practice is the same as above, but the NB and NT are calculated separately. )
 					else {
 						for (int i = 1; i < NT_index; i++)
 							tmp_rate += NT_point[i] - NT_point[i-1];
@@ -1304,7 +1388,7 @@ int main(void)
 						rate = 1200 / (cur_rate / 2);
 					}
 
-					// SVC model
+					// The SVM classifier( SVC ) determines whether to use TI output or Ours algorithm output (0: Ours, 1: TI).
 					svm_input[0] = index_of_fftmax;
 					if (br0hr1 == 0){
 						svm_input[1] = br_mean_FFT;
@@ -1326,36 +1410,41 @@ int main(void)
 					}
 				}
 
-				// 當呼吸律或心律為異常值, 以前一秒的輸出值取代。
+				// When the respiratory or cardiac rhythm is abnormal, the previous second's output value is substituted.
 				br_rpm = final_br;
 				hr_rpm = final_hr;
 				br_rpm = substitute(tmp_br, br_rpm, 1);
 				hr_rpm = substitute(tmp_br, hr_rpm, 0);
-				br_rpm = round(br_rpm*10000)/10000;
-				hr_rpm = round(hr_rpm*10000)/10000;
+				br_rpm = round(br_rpm*10000)/10000;  // Rounded to the 4th decimal place.
+				hr_rpm = round(hr_rpm*10000)/10000;  // Rounded to the 4th decimal place.
 				tmp_br = br_rpm;
 				tmp_hr = hr_rpm;
 
 				printf("BR = %f\nHR = %f\n", br_rpm, hr_rpm);
 				
+				// The calculation does not begin until the time enters the second hand at 00.
 				if (seconds == 0 && counter == 0) {
 					counter += 1;
 					begin = 1;
 					printf("Start recording features\n");
 				}
 
+				// Start generating subsequent sleep features.
 				if (begin == 1) {
+					// var_RPM_br_KNN & var_RPM_hr_KNN
+					// To generate this feature, 600 data are used, so the data are read here step by step, 
+					// and when the number of data exceeds 600, the elements of the array are left-shifted and the latest value read is placed at the end of the array.
 					if (var_index >= 600) {
 						for (int num = 0; num < 599; num++) {
 							var_RPM_br_KNN[num] = var_RPM_br_KNN[num + 1];
 							var_RPM_hr_KNN[num] = var_RPM_hr_KNN[num + 1];
 						}
-						var_RPM_br_KNN[599] = br_rpm;
-						var_RPM_hr_KNN[599] = hr_rpm;
+						var_RPM_br_KNN[599] = br_rpm;  // The value entered is the respiration rate.
+						var_RPM_hr_KNN[599] = hr_rpm;  // The value entered is the cardiac rate.
 					}
 					else {
-						var_RPM_br_KNN[var_index] = br_rpm;
-						var_RPM_hr_KNN[var_index] = hr_rpm;
+						var_RPM_br_KNN[var_index] = br_rpm;  // The value entered is the respiration rate.
+						var_RPM_hr_KNN[var_index] = hr_rpm;  // The value entered is the cardiac rate.
 						var_index += 1;
 					}
 
@@ -1363,9 +1452,11 @@ int main(void)
 					if (array_index_bmi == 1200) {
 
 						// Function
-						mov_dens_fn(current_window_bmi, &mov_dens);
+						mov_dens_fn(current_window_bmi, &mov_dens);  // Input: current_window_bmi, Output: mov_dens
 
 						// Output (with slide)
+						// The feature of the calculated mov_dens is entered into a new array, and when 
+						// the array exceeds 60, the internal elements are shifted to the left and new values are placed at the end of the array.
 						if (mov_dens_index >= 60) {
 							for (int num = 0; num < 59; num++)
 								mov_dens_ar[num] = mov_dens_ar[num + 1];
@@ -1382,13 +1473,17 @@ int main(void)
 					if (var_index >= 10) {
 
 						// Input
+						// Get the latest 10 respiration rates into the array.
 						for (int num = 9; num >= 0; num--)
 							tfRSA_contain10_br[9-num] = var_RPM_br_KNN[var_index-1-num];
 						
 						// Function
-						tfRSA_fn(tfRSA_contain10_br, &tfRSA);
+						tfRSA_fn(tfRSA_contain10_br, &tfRSA);  // Input: tfRSA_contain10_br, Output: tfRSA
 
 						// Output (with slide)
+						// The feature of the calculated tfRSA_fn is entered into a new array, and when 
+						// the array exceeds 30, the internal elements are shifted to the left and new values are placed at the end of the array,
+						// then start calculating stfRSA.
 						if (tfRSA_index >= 31) {
 							for (int num = 0; num < 30; num++)
 								tfRSA_ar[num] = tfRSA_ar[num + 1];
@@ -1405,13 +1500,14 @@ int main(void)
 					if (var_index >= 31) {
 
 						// ----------- Input (sfRSA) ----------- 
+						// Get the latest 31 respiration rates into the array.
 						for (int num = 30; num >= 0; num--)
 							sfRSA_contain31_br[30-num] = var_RPM_br_KNN[var_index-1-num];
 						
-						// Function
+						// Function ( Savitzky-Golay filter )
 						savgol_filter(sfRSA_contain31_br, 31, 3, &sfRSA_mean, sfRSA);
 
-						// Output (with slide)
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (sfRSA_index >= 60) {
 							for (int num = 0; num < 59; num++)
 								sfRSA_ar[num] = sfRSA_ar[num + 1];
@@ -1423,13 +1519,14 @@ int main(void)
 						}
 
 						// ----------- Input (sdfRSA) ----------- 
+						// Take the absolute value after subtracting.
 						for (int tmp_idx = 0; tmp_idx < 31; tmp_idx++)
 							sdfRSA_tmp[tmp_idx] = abs(var_RPM_br_KNN[tmp_idx] - sfRSA[tmp_idx]);
 
-						// Function
+						// Function ( Savitzky-Golay filter )
 						savgol_filter(sdfRSA_tmp, 31, 3, &sdfRSA_mean, sdfRSA);
 
-						// Output (with slide)
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (sdfRSA_index >= 60) {
 							for (int num = 0; num < 59; num++)
 								sdfRSA_ar[num] = sdfRSA_ar[num + 1];
@@ -1444,10 +1541,10 @@ int main(void)
 					// stfRSA
 					if (open_stfRSA == 1) {
 
-						// Function
+						// Function ( Savitzky-Golay filter )
 						savgol_filter(tfRSA_ar, 31, 2, &stfRSA_mean, stfRSA);
 
-						// Output (with slide)
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (stfRSA_index >= 60) {
 							for (int num = 0; num < 59; num++)
 								stfRSA_ar[num] = stfRSA_ar[num + 1];
@@ -1465,13 +1562,14 @@ int main(void)
 					if (var_index >= 10) {
 
 						// Input
+						// Get the latest 10 cardiac rates into the array.
 						for (int num = 9; num >= 0; num--)
 							tmHR_contain10_hr[9-num] = var_RPM_hr_KNN[var_index-1-num];
 
 						// Function
 						tfRSA_fn(tmHR_contain10_hr, &tmHR);
 						
-						// Output (with slide)
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (tmHR_index >= 31) {
 							for (int num = 0; num < 30; num++)
 								tmHR_ar[num] = tmHR_ar[num + 1];
@@ -1488,13 +1586,14 @@ int main(void)
 					if (var_index >= 31) {
 
 						// ----------- Input (smHR) ----------- 
+						// Get the latest 31 cardiac rates into the array.
 						for (int num = 30; num >= 0; num--)
 							smHR_contain31_hr[30-num] = var_RPM_hr_KNN[var_index-1-num];
 						
-						// Function
+						// Function ( Savitzky-Golay filter )
 						savgol_filter(smHR_contain31_hr, 31, 3, &smHR_mean, smHR);
 
-						// Output (with slide)
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (smHR_index >= 60) {
 							for (int num = 0; num < 59; num++)
 								smHR_ar[num] = smHR_ar[num + 1];
@@ -1506,13 +1605,14 @@ int main(void)
 						}
 
 						// ----------- Input (sdmHR) ----------- 
+						// Take the absolute value after subtracting.
 						for (int tmp_idx = 0; tmp_idx < 31; tmp_idx++)
 							sdmHR_tmp[tmp_idx] = abs(var_RPM_hr_KNN[tmp_idx] - smHR[tmp_idx]);
 
-						// Function
+						// Function ( Savitzky-Golay filter )
 						savgol_filter(sdmHR_tmp, 31, 3, &sdmHR_mean, sdmHR);
 
-						// Output (with slide)
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (sdmHR_index >= 60) {
 							for (int num = 0; num < 59; num++)
 								sdmHR_ar[num] = sdmHR_ar[num + 1];
@@ -1527,10 +1627,10 @@ int main(void)
 					// stmHR
 					if (open_stmHR == 1) {
 
-						// Function
+						// Function ( Savitzky-Golay filter )
 						savgol_filter(stmHR_ar, 31, 2, &stmHR_mean, stmHR);
 
-						// Output (with slide)
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (stmHR_index >= 60) {
 							for (int num = 0; num < 59; num++)
 								stmHR_ar[num] = stmHR_ar[num + 1];
@@ -1543,9 +1643,11 @@ int main(void)
 					}
 					
 					// LF_HF_LFHF
-					emerge_sum_LF = 0;
-					emerge_sum_HF = 0;
+					emerge_sum_LF = 0;  // Accumulate the energy of LF.
+					emerge_sum_HF = 0;  // Accumulate the energy of HF.
 					for (int state_HL = 0; state_HL < 2; state_HL++) {
+						// Different filter parameters are used to calculate the features of LF and HF, so this part is cycled twice and the corresponding HF or LF is calculated.
+						// state_HL = 0 (LF), state_HL = 1 (HF)
 						if (state_HL == 0){
 							double b[5] = { 0.0009995048070486716, -0.003994449797763787, 0.005989890331755259, -0.003994449797763788, 0.0009995048070486716 };
 							double a[5] = { 1.0, -3.996631500101437, 5.9910822943901785, -3.9922680954261405, 0.9978176514624266 };
@@ -1573,9 +1675,9 @@ int main(void)
 							}
 						}
 					}
-					LFHF_eng = emerge_sum_HF / emerge_sum_LF;
+					LFHF_eng = emerge_sum_HF / emerge_sum_LF;  // The LFHF is obtained by dividing the sum.
 
-					// Output (with slide) [LF, HF, LFHF]
+					// Output (with slide) [LF, HF, LFHF] ( Save and shift the output feature elements in the array. )
 					if (LF_HF_LFHF_index >= 60) {
 						for (int num = 0; num < 59; num++) {
 							LF_ar[num] = LF_ar[num + 1];
@@ -1593,7 +1695,7 @@ int main(void)
 						LF_HF_LFHF_index++;
 					}
 
-					// Output (with slide) [HF_arr, LFHF_arr]
+					// Output (with slide) [HF_arr, LFHF_arr] ( Save and shift the output feature elements in the array. )
 					if (sF_index >= 31) {
 						for (int num = 0; num < 30; num++) {
 							HF_arr[num] = HF_arr[num + 1];
@@ -1601,7 +1703,7 @@ int main(void)
 						}
 						HF_arr[30] = emerge_sum_HF;
 						LFHF_arr[30] = LFHF_eng;
-						open_HF = 1;
+						open_HF = 1;  // If the number of HF and LFHF features reaches 31 or more, proceed to the next step.
 					}
 					else {
 						HF_arr[sF_index] = emerge_sum_HF;
@@ -1611,13 +1713,13 @@ int main(void)
 
 					if (open_HF == 1) {
 
-						// Function
+						// Function ( Savitzky-Golay filter )
 						// sHF
 						savgol_filter(HF_arr, 31, 3, &sHF_mean, sHF);
 						// sLFHF
 						savgol_filter(LFHF_arr, 31, 3, &sLFHF_mean, sLFHF);
 
-						// Output (with slide)
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (sHF_index >= 60) {
 							for (int num = 0; num < 59; num++) {
 								sHF_ar[num] = sHF_ar[num + 1];
@@ -1636,10 +1738,10 @@ int main(void)
 					// ------------------------------------- 睡眠階段 (Paper2) ------------------------------------- 
 					// Variance of RPM
 					if (var_index == 600) {
-						var_RPM(var_RPM_br_KNN, &var_RPM_br);
-						var_RPM(var_RPM_hr_KNN, &var_RPM_hr);
+						var_RPM(var_RPM_br_KNN, &var_RPM_br);  // var_RPM of Respiratory rate
+						var_RPM(var_RPM_hr_KNN, &var_RPM_hr);  // var_RPM of cardiac rate
 
-						// Output (with slide) 
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (var_RPM_index >= 60) {
 							for (int num = 0; num < 59; num++) {
 								var_RPM_ar[num] = var_RPM_ar[num + 1];
@@ -1660,13 +1762,15 @@ int main(void)
                 	// Deep Parameter
 					if (array_index_bmi == 1200) {
 						bmi(current_window_bmi, &bmi_current);
+						// The last 60 elements of var_RPM_hr_KNN are the most average.
 						hk = 0;
 						for (int i = var_index-60; i < var_index; i ++)
 							hk += var_RPM_hr_KNN[i];
 						hk = hk / 60;
+						// Calculate deep_parameter
 						deep_parameter(bmi_current, hk, &dk);
 
-						// Output (with slide) 
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (bmi_ar_index >= 60) {
 							for (int num = 0; num < 59; num++) {
 								bmi_ar[num] = bmi_ar[num + 1];
@@ -1687,7 +1791,7 @@ int main(void)
     					ada(current_window_bmi, array_index_bmi, 0, &output_br);
 						ada(current_window_bmi, array_index_bmi, 1, &output_hr);
 
-						// Output (with slide) 
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (ada_index >= 60) {
 							for (int num = 0; num < 59; num++) {
 								ada_br_ar[num] = ada_br_ar[num + 1];
@@ -1705,11 +1809,13 @@ int main(void)
 
 					// REM Parameter
 					if (var_index >= 5 * 60) {
+						// The final breathing rate of 300 was obtained.
 						for (int i = 0; i < 300; i++)
 							rem_contain[i] = var_RPM_br_KNN[var_index - (299 - i)];
+
 						rem_parameter(rem_contain, &rem_par);
 
-						// Output (with slide) 
+						// Output (with slide) ( Save and shift the output feature elements in the array. )
 						if (rem_par_index >= 60) {
 							for (int num = 0; num < 59; num++) {
 								rem_parameter_ar[num] = rem_parameter_ar[num + 1];
@@ -1730,7 +1836,7 @@ int main(void)
 					seconds_tf = local_tf->tm_sec;
 					time_fn(hours_tf, minutes_tf, seconds_tf, &time_featres);
 
-					// Output (with slide) 
+					// Output (with slide) ( Save and shift the output feature elements in the array. )
 					if (time_fn_index >= 60) {
 						for (int num = 0; num < 59; num++) {
 							time_ar[num] = time_ar[num + 1];
@@ -1743,7 +1849,7 @@ int main(void)
 					}
 					
 					// breath & heart
-					// Output (with slide) 
+					// Output (with slide) ( Save and shift the output feature elements in the array. )
 					if (br_hr_index >= 60) {
 						for (int num = 0; num < 59; num++) {
 							breath_ar[num] = breath_ar[num + 1];
@@ -1758,7 +1864,7 @@ int main(void)
 						br_hr_index++;
 					}
 
-					// 換日
+					// Special circumstances: Change of date
 					if (counter_mean == 0) {
 						start_hour = hours_tf;
 						start_min = minutes_tf;
@@ -1771,20 +1877,21 @@ int main(void)
 						end_min = minutes_tf;
 					}
 
-					// 小時
+					// Special circumstances: Change of hours
 					if (end_hour - start_hour >= 1 || end_hour - start_hour == -23) {
 						start_hour = end_hour;
 						start_min = end_min;
 						next_HM = 1;
 					}
 
-					// 分鐘
+					// Special circumstances: Change of minutes
 					if (end_min - start_min >= 1) {
 						start_min = end_min;
 						next_HM = 1;
 					}
 
 					if (next_HM == 1 && looper >= 10) {
+						// Average all features. mean_fn_double(input, output)
 						mean_fn_double (breath_ar, br_hr_index, &all_results[0]);
 						mean_fn_double (heart_ar, br_hr_index, &all_results[1]);
 						mean_fn_double (bmi_ar, bmi_ar_index, &all_results[2]);
@@ -1810,6 +1917,7 @@ int main(void)
 						mean_fn_double (stmHR_ar, stmHR_index, &all_results[22]);
 						mean_fn_int (time_ar, time_fn_index, &all_results[23]);
 
+						// Filter out abnormally large feature values and set the upper limit.
 						for (int re_index = 0; re_index < 24; re_index++) {
 							if (all_results[re_index] > 140700000)
 							    all_results[re_index] = 140700000;

@@ -363,10 +363,21 @@ Struct dbscan_output(float (*pos1X)[6], int number_of_points)
     //printf("%d\n", points[0].cluster_id);
     for(int num=0; num < num_points_1; ++num)
     {
-        output.vsos[num][0]=points[num].x;
-        output.vsos[num][1]=points[num].y;
-        output.vsos[num][2]=points[num].z;
-        output.vsos[num][3]=(float) points[num].cluster_id;
+        if ( isnan(points[num].x) == 1 || isnan(points[num].y) == 1 || points[num].cluster_id>100)
+        {
+            output.vsos[num][0]=0;
+            output.vsos[num][1]=0;
+            output.vsos[num][2]=0;
+            output.vsos[num][3]=-1.0;
+        }
+        else
+        {
+            output.vsos[num][0]=points[num].x;
+            output.vsos[num][1]=points[num].y;
+            output.vsos[num][2]=points[num].z;
+            output.vsos[num][3]=(float) points[num].cluster_id;            
+        }
+
     }
     free(points);
     return output;//增加的

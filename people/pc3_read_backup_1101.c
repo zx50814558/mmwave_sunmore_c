@@ -639,9 +639,9 @@ int main() {
 				  {
 					  z_fall_lying[num] = z_fall_lying[num+1]; //往前移位
 				  }
-		      }
-		      else
-		      {
+			  }
+			  else
+			  {
 				  fall_lying_count += 1;
 				  z_fall_lying[fall_lying_count] = z_mean; //z_fall_lying都放z_mean
 			  }

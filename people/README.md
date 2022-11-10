@@ -2,11 +2,11 @@
 ------------
 
 
-pc3_animal_1027.c  
+pc3_read_backup_1027.c  
 更改寫檔方式 解決中斷
 
 ------------
 
 
-pc3_animal_1101.c  
+pc3_read_backup_1101.c  
 更改變數 解決跌倒偵測未出現

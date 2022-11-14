@@ -98,12 +98,12 @@ cd <your repositories path>/animal
 
 2. Compiling C Program.
 ```
-gcc pc3_animal.c -o pc3_animal -lm
+gcc pc3_animal_1110.c -o pc3_animal_1110 -lm
 ```
 
 3. Execution commands.
 ```
-Linux: ./pc3_animal
+Linux: ./pc3_animal_1110
 ```
 
 ### Running ( People )
@@ -118,10 +118,10 @@ cd <your repositories path>/people
 
 2. Compiling C Program.
 ```
-gcc pc3_read_backup.c -o pc3_read_backup -lm
+gcc pc3_read_backup_1110.c -o pc3_read_backup_1110 -lm
 ```
 
 3. Execution commands.
 ```
-Linux: ./pc3_read_backup
+Linux: ./pc3_read_backup_1110
 ```

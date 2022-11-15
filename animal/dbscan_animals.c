@@ -259,66 +259,6 @@ double euclidean_dist(point_t *a, point_t *b)
 {
     return sqrt(pow(a->x - b->x, 2) + pow(a->y - b->y, 2) + pow(a->z - b->z, 2));
 }
-/*
-void input_data(float ** intput_array)
-{
-
-}
-*/
-unsigned int parse_input(FILE *file, point_t **points, double *epsilon, unsigned int *minpts)
-{
-    unsigned int num_points, i = 0;
-
-    //fscanf(file, "%lf %u %u\n", epsilon, minpts, &num_points);
-    *epsilon = 1;
-    *minpts = 2;
-    num_points = 3;
-    //解決第一行輸入問題 epsilon minpts num_points
-    //printf("epsilon =  %lf \n", *epsilon);
-    //printf("minpts =  %d \n", *minpts);
-    //printf("num_points =  %d \n", num_points);
-    point_t *p = (point_t *)
-    //printf("*pointer 的值：%d\n", *pointer);
-    calloc(num_points, sizeof(point_t)); //動態分配記憶體
-    if (p == NULL) {
-        perror("Failed to allocate points array");
-        return 0;
-    }
-    /*
-    while (i < num_points) {
-          fscanf(file, "%lf %lf %lf\n",
-                 &(p[i].x), &(p[i].y), &(p[i].z));
-          p[i].cluster_id = UNCLASSIFIED;
-          ++i;
-    }
-    */
-    //load
-    float pos1X[3][4];
-    pos1X[0][0] = 1.0;
-    pos1X[0][1] = 15.0;
-    pos1X[0][2] = 15.0;
-    pos1X[0][3] = -1.0;
-    pos1X[1][0] = 1.0;
-    pos1X[1][1] = 1.0;
-    pos1X[1][2] = 1.0;
-    pos1X[1][3] = -1.0;
-    pos1X[2][0] = 2.0;
-    pos1X[2][1] = 2.0;
-    pos1X[2][2] = 12.0;
-    pos1X[2][3] = -1.0;
-    //只要傳入pos1X
-    int row = sizeof(pos1X) / sizeof(pos1X[0]);
-    printf("Number of rows: %d\n", row);
-    for(int num=0; num < row; ++num)
-    {
-        p[num].x = pos1X[num][0];
-        p[num].y = pos1X[num][1];
-        p[num].z = pos1X[num][2];
-        p[num].cluster_id = pos1X[num][3];
-    }
-    *points = p;
-    return num_points;
-}
 
 void print_points(point_t *points, unsigned int num_points)
 {
@@ -352,7 +292,7 @@ Struct dbscan_output(float (*pos1X)[6], int number_of_points)
     //point都填入了
     if (num_points) {
         dbscan(points, num_points, epsilon,minpts, euclidean_dist);
-        print_points(points, num_points);
+        //print_points(points, num_points);
     }
 
     int num_points_1;
@@ -361,24 +301,47 @@ Struct dbscan_output(float (*pos1X)[6], int number_of_points)
     float dbscan_array[num_points_1][4];
     //printf("number_of_points = %d\n", number_of_points);
     //printf("%d\n", points[0].cluster_id);
-    for(int num=0; num < num_points_1; ++num)
+    int labels_number = num_points_1;
+    int temp_point_count = 0;
+    int reduce_label = 0;
+    for(int lab_num=0; lab_num < 300; ++lab_num)
     {
-        if ( isnan(points[num].x) == 1 || isnan(points[num].y) == 1 || points[num].cluster_id>100)
+        int temp_point_count_1 = 0; //用來計算當次label的數量如果是0就是抓到
+        for(int num=0; num < num_points_1; ++num) //遍歷所有點
         {
-            output.vsos[num][0]=0;
-            output.vsos[num][1]=0;
-            output.vsos[num][2]=0;
-            output.vsos[num][3]=-1.0;
-        }
-        else
-        {
-            output.vsos[num][0]=points[num].x;
-            output.vsos[num][1]=points[num].y;
-            output.vsos[num][2]=points[num].z;
-            output.vsos[num][3]=(float) points[num].cluster_id;            
-        }
+            //step1:先假設labels的數量或labels的數量跟點的數量一樣
+            //stpe2:用step1當迴圈 遍歷所有點 存進去順便計數 當計數跟點的數量一樣就跳開 否則執行step3
+            //stpe3:如果算出來該label數量=0 and 計數跟點的數量不一樣 就代表抓到 後面的labels都要減  
+            if (points[num].cluster_id == lab_num)
+            {
 
-    }
+                
+                if ( isnan(points[num].x) == 1 || isnan(points[num].y) == 1 || points[num].cluster_id>100)
+                {
+                    output.vsos[temp_point_count][0]=0.0;
+                    output.vsos[temp_point_count][1]=0.0;
+                    output.vsos[temp_point_count][2]=0.0;
+                    output.vsos[temp_point_count][3]=-1.0;
+                }
+                else
+                {
+                    output.vsos[temp_point_count][0]=points[num].x;
+                    output.vsos[temp_point_count][1]=points[num].y;
+                    output.vsos[temp_point_count][2]=points[num].z;
+                    output.vsos[temp_point_count][3]=(float) (points[num].cluster_id - reduce_label);            
+                }
+                //printf("temp_point_count:%d", temp_point_count);
+                //printf("in dbscan.c x:%f y:%f z:%f index:%f\n", output.vsos[temp_point_count][0], output.vsos[temp_point_count][1], output.vsos[temp_point_count][2], output.vsos[temp_point_count][3]);	
+                temp_point_count+=1;
+                temp_point_count_1+=1;            
+            }
+        } 
+        if (temp_point_count_1 ==0)
+        {
+            reduce_label+=1;
+        }    
+    }    
+
     free(points);
     return output;//增加的
 }

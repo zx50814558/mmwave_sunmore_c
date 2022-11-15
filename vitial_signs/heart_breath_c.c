@@ -241,7 +241,7 @@ float heart_ti[800];
 // Sklearn to c
 int svm_result;
 double svm_input[3];
-double tmp_breath_rate = 0;
+// double tmp_breath_rate = 0;
 
 // Shifting data
 void array_shift()
@@ -1007,8 +1007,8 @@ int main(void)
 					printf("error");
 					return -1;
 				}
-				tmp_breath_rate = (ceil((int)hr_rate * 1.0 / 4) + (int)br_rate) / 2;
-				fprintf(fp, "%d:%d:%d, %d, %d\n", hours, minutes, seconds, (int)hr_rate, (int)tmp_breath_rate);
+				// tmp_breath_rate = (ceil((int)hr_rate * 1.0 / 4) + (int)br_rate) / 2;
+				fprintf(fp, "%d:%d:%d, %d, %d\n", hours, minutes, seconds, (int)hr_rate, (int)br_rate);
 				fclose(fp);
 				printf("\n");
 			}

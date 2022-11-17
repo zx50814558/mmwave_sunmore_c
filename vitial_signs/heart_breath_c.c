@@ -998,7 +998,6 @@ int main(void)
 					br_rate = 0;
 					hr_rate = 0;
 				}
-				printf("br_rate = %f\nhr_rate = %f\n", br_rate, hr_rate);
 
 				// 寫入 logs 檔案
 				FILE *fp = fopen(filename, "a");
@@ -1010,7 +1009,11 @@ int main(void)
 				// tmp_breath_rate = (ceil((int)hr_rate * 1.0 / 4) + (int)br_rate) / 2;
 				fprintf(fp, "%d:%d:%d, %d, %d\n", hours, minutes, seconds, (int)hr_rate, (int)br_rate);
 				fclose(fp);
-				printf("\n");
+				printf("\e[1;1H");
+				int systemArb = system("clear");
+				printf("=========================================================\n");
+				printf("|      Heart rate: %d    |    Respiratory rate: %d      |\n", (int)hr_rate, (int)br_rate);
+				printf("=========================================================\n");
 			}
 		}
 	}

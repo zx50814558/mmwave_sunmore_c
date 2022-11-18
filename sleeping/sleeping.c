@@ -993,6 +993,13 @@ int main(void)
             LF_HF_LFHF_windows[5999] = (double)vsos_array[7];
         }
 
+		if (array_index < 800 && array_index%20 == 0) {
+			printf("\e[1;1H");
+			int systemArb = system("clear");
+			printf("=========================================================\n");
+			printf("|       Cumulative number of data to 800: %*d           |\n", 3, array_index);
+			printf("=========================================================\n");
+		}
         // When the number of read data reaches 800 or more, the sleep stage of the algorithm starts.
 		if (array_index >= 800) {
 			// Array shift
@@ -1421,14 +1428,21 @@ int main(void)
 				tmp_hr = hr_rpm;
 
 				// printf("BR = %f\nHR = %f\n", br_rpm, hr_rpm);
-				
+				printf("\e[1;1H");
+				int systemArb = system("clear");
 				// The calculation does not begin until the time enters the second hand at 00.
 				if (seconds == 0 && counter == 0) {
 					counter += 1;
 					begin = 1;
-					printf("Start recording features\n");
 				}
-
+				else if (seconds != 0 && counter == 0) {
+					printf("=========================================================\n");
+					printf("|       Cumulative number of data to 800:      OK       |\n");
+					printf("=========================================================\n");
+					printf("|       Remaining preparation times: %*d sec            |\n", 3, 610 - (var_index + looper) + 60 - seconds);
+					printf("=========================================================\n");
+					
+				}
 				// Start generating subsequent sleep features.
 				if (begin == 1) {
 					// var_RPM_br_KNN & var_RPM_hr_KNN
@@ -1890,13 +1904,18 @@ int main(void)
 						start_min = end_min;
 						next_HM = 1;
 					}
-					printf("\e[1;1H");
-					int systemArb = system("clear");
+					
 					printf("=========================================================\n");
-					if (610 - (var_index + looper) >= 0)
-						printf("|         Remaining preparation times: %d sec           |\n", 610 - (var_index + looper));
-					else
-						printf("|             Start generating sleep stages             |\n");
+					if (610 - (var_index + looper) >= 0) {
+						printf("|       Cumulative number of data to 800:      OK       |\n");
+						printf("=========================================================\n");
+						printf("|       Remaining preparation times: %*d sec            |\n", 3, 610 - (var_index + looper));
+					}
+					else {
+						printf("|       Cumulative number of data to 800:      OK       |\n");
+						printf("=========================================================\n");
+						printf("|       Preparation sleep features:            OK       |\n");
+					}
 					printf("=========================================================\n");
 					if (next_HM == 1 && looper >= 10) {
 						// Average all features. mean_fn_double(input, output)
@@ -1965,7 +1984,7 @@ int main(void)
 						next_HM = 0;
 					}
 					if (610 - (var_index + looper) < 0) {
-						printf("|    Current time: %d:%d:%d   |   Sleeping stage: %d    |\n", int(hours_tf), int(minutes_tf), int(seconds_tf), int(predict_result));
+						printf("|       Current time: %*d:%*d:%*d  |  Sleeping stage: %d    |\n", 2, hours_tf, 2, minutes_tf, 2, seconds_tf, predict_result);
 						printf("=========================================================\n");
 					}
 				}

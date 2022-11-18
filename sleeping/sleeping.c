@@ -1283,7 +1283,7 @@ int main(void)
 						}
 						ltera += 1;
 					}
-					printf("\n");
+					// printf("\n");
 					
 					// --------------------- Feature sort --------------------- 
 
@@ -1420,7 +1420,7 @@ int main(void)
 				tmp_br = br_rpm;
 				tmp_hr = hr_rpm;
 
-				printf("BR = %f\nHR = %f\n", br_rpm, hr_rpm);
+				// printf("BR = %f\nHR = %f\n", br_rpm, hr_rpm);
 				
 				// The calculation does not begin until the time enters the second hand at 00.
 				if (seconds == 0 && counter == 0) {
@@ -1755,7 +1755,8 @@ int main(void)
 							var_HPM_ar[var_RPM_index] = var_RPM_hr;
 							var_RPM_index++;
 						}
-						looper += 1;
+						if (looper <= 11)
+							looper += 1;
 					}
 
 					// Body Movement Index (BMI)
@@ -1889,7 +1890,14 @@ int main(void)
 						start_min = end_min;
 						next_HM = 1;
 					}
-
+					printf("\e[1;1H");
+					int systemArb = system("clear");
+					printf("=========================================================\n");
+					if (610 - (var_index + looper) >= 0)
+						printf("|         Remaining preparation times: %d sec           |\n", 610 - (var_index + looper));
+					else
+						printf("|             Start generating sleep stages             |\n");
+					printf("=========================================================\n");
 					if (next_HM == 1 && looper >= 10) {
 						// Average all features. mean_fn_double(input, output)
 						mean_fn_double (breath_ar, br_hr_index, &all_results[0]);
@@ -1955,12 +1963,13 @@ int main(void)
 						stmHR_index = 0;
 						time_fn_index = 0;
 						next_HM = 0;
-
+					}
+					if (610 - (var_index + looper) < 0) {
+						printf("|    Current time: %d:%d:%d   |   Sleeping stage: %d    |\n", int(hours_tf), int(minutes_tf), int(seconds_tf), int(predict_result));
+						printf("=========================================================\n");
 					}
 				}
-
 				start_time = end_time;
-				printf("\n");
             }
         }
     }

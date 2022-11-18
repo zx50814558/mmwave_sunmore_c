@@ -352,7 +352,7 @@ Struct dbscan_output(float (*pos1X)[6], int number_of_points)
     //point都填入了
     if (num_points) {
         dbscan(points, num_points, epsilon,minpts, euclidean_dist);
-        print_points(points, num_points);
+        //print_points(points, num_points);
     }
 
     int num_points_1;

@@ -997,7 +997,7 @@ int main(void)
 			printf("\e[1;1H");
 			int systemArb = system("clear");
 			printf("=========================================================\n");
-			printf("|       Cumulative number of data to 800: %*d           |\n", 3, array_index);
+			printf("|      Cumulative number of data to 800: %*d            |\n", 3, array_index);
 			printf("=========================================================\n");
 		}
         // When the number of read data reaches 800 or more, the sleep stage of the algorithm starts.
@@ -1437,9 +1437,9 @@ int main(void)
 				}
 				else if (seconds != 0 && counter == 0) {
 					printf("=========================================================\n");
-					printf("|       Cumulative number of data to 800:      OK       |\n");
+					printf("|      Cumulative number of data to 800:      OK        |\n");
 					printf("=========================================================\n");
-					printf("|       Remaining preparation times: %*d sec            |\n", 3, 610 - (var_index + looper) + 60 - seconds);
+					printf("|      Remaining preparation times: %*d sec             |\n", 3, 610 - (var_index + looper) + 60 - seconds);
 					printf("=========================================================\n");
 					
 				}
@@ -1907,14 +1907,14 @@ int main(void)
 					
 					printf("=========================================================\n");
 					if (610 - (var_index + looper) >= 0) {
-						printf("|       Cumulative number of data to 800:      OK       |\n");
+						printf("|      Cumulative number of data to 800:      OK        |\n");
 						printf("=========================================================\n");
-						printf("|       Remaining preparation times: %*d sec            |\n", 3, 610 - (var_index + looper));
+						printf("|      Remaining preparation times: %*d sec             |\n", 3, 610 - (var_index + looper));
 					}
 					else {
-						printf("|       Cumulative number of data to 800:      OK       |\n");
+						printf("|      Cumulative number of data to 800:      OK        |\n");
 						printf("=========================================================\n");
-						printf("|       Preparation sleep features:            OK       |\n");
+						printf("|      Preparation sleep features:            OK        |\n");
 					}
 					printf("=========================================================\n");
 					if (next_HM == 1 && looper >= 10) {
@@ -1984,7 +1984,14 @@ int main(void)
 						next_HM = 0;
 					}
 					if (610 - (var_index + looper) < 0) {
-						printf("|       Current time: %*d:%*d:%*d  |  Sleeping stage: %d    |\n", 2, hours_tf, 2, minutes_tf, 2, seconds_tf, predict_result);
+						if (predict_result == 0)
+							printf("|      Current time: %*d:%*d:%*d  |  Sleeping stage: DEEP  |\n", 2, hours_tf, 2, minutes_tf, 2, seconds_tf);
+						else if (predict_result == 1)
+							printf("|      Current time: %*d:%*d:%*d  |  Sleeping stage: LIGHT |\n", 2, hours_tf, 2, minutes_tf, 2, seconds_tf);
+						else if (predict_result == 2)
+							printf("|      Current time: %*d:%*d:%*d  |  Sleeping stage: REM   |\n", 2, hours_tf, 2, minutes_tf, 2, seconds_tf);
+						else if (predict_result == 3)
+							printf("|      Current time: %*d:%*d:%*d  |  Sleeping stage: AWAKE |\n", 2, hours_tf, 2, minutes_tf, 2, seconds_tf);
 						printf("=========================================================\n");
 					}
 				}

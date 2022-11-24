@@ -1438,8 +1438,8 @@ int main(void)
 					begin = 1;
 				}
 				else if (seconds != 0 && counter == 0) {
-                    printf("=========================================================\n");
-                    printf("|      Version: V1.0                                    |\n");
+					printf("=========================================================\n");
+					printf("|      Version: V1.0                                    |\n");
 					printf("=========================================================\n");
 					printf("|      Cumulative number of data to 800:      OK        |\n");
 					printf("=========================================================\n");
@@ -1909,7 +1909,7 @@ int main(void)
 						next_HM = 1;
 					}
 					printf("=========================================================\n");
-                    printf("|      Version: V1.0                                    |\n");
+					printf("|      Version: V1.0                                    |\n");
 					printf("=========================================================\n");
 					if (610 - (var_index + looper) >= 0) {
 						printf("|      Cumulative number of data to 800:      OK        |\n");

@@ -1011,8 +1011,8 @@ int main(void)
 				fclose(fp);
 				printf("\e[1;1H");
 				int systemArb = system("clear");
-                printf("=========================================================\n");
-                printf("|      Version: V1.0                                    |\n");
+				printf("=========================================================\n");
+				printf("|      Version: V1.0                                    |\n");
 				printf("=========================================================\n");
 				printf("|      Heart rate: %d    |    Respiratory rate: %d      |\n", (int)hr_rate, (int)br_rate);
 				printf("=========================================================\n");

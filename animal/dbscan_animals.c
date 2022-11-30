@@ -348,7 +348,7 @@ Struct dbscan_output(float (*pos1X)[6], int number_of_points)
 unsigned int parse_input_1(point_t **points, float (*pos1X)[6], double *epsilon, unsigned int *minpts , int number_of_points )
 {
     unsigned int num_points, i = 0;
-    *epsilon = 0.5;
+    *epsilon = 0.6;
     *minpts = 18;
     num_points = number_of_points;
     point_t *p = (point_t *)

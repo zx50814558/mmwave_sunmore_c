@@ -393,6 +393,10 @@ int main(int argc, char *argv[]) {
 			  if (frame_number_inf>2) //前3frame會繼續累加點雲
 			  {
 				  int cnt_3 = point_cnt_array[1] + point_cnt_array[2] + row;
+				  if (mode == 0)
+				  {
+					  printf("總共%d個點雲\n", cnt_3);
+				  }
 				  //printf("總共%d個點雲\n", cnt_3);
 				  float pos1a[cnt_3][5];
 				  //放前2 FRAME到最終陣列
@@ -413,7 +417,7 @@ int main(int argc, char *argv[]) {
 					  }
 				  }	
 				  int small_snr_count = 0;
-				  float snr_tr = 8.0; //太小的SNR刪除閥值! 可調整
+				  float snr_tr = 0.0; //太小的SNR刪除閥值! 可調整
 				  for(int num=0; num < cnt_3; ++num)//找snr小於8的
 				  {
 					  if (pos1a[num][4]<snr_tr)
@@ -807,25 +811,41 @@ int main(int argc, char *argv[]) {
 			  {
 				  //point_cnt_array這個陣列是放點雲數量的
 				  point_cnt_array[frame_number] = row;
+				  if (mode == 0)
+				  {
+					  printf("row%d\n", row);
+					  printf("row_temp%d\n", row_temp);
+				  }
 				  //printf("row%d\n", row);
 				  //printf("row_temp%d\n", row_temp);
 				  for(int num=0+row_temp; num < row+row_temp; ++num)
 				  {
+					  if (mode == 0)
+					  {
+						  printf("上一個frame的數量%d\n", row_temp);
+					  }
 					  //printf("上一個frame的數量%d\n", row_temp);
 					  for(int num_1=0; num_1 < 5; ++num_1) // put number in array
 					  {
 						  v6_2d_output_bigdata[num][num_1] = v6_2d_output[num-row_temp][num_1];
 					  }
+					  if (mode == 0)
+					  {
+						  printf("第%d個frame, 共有%d個點雲\n",num, point_cnt_array[num]);		
+					  }
 					  //printf("第%d個frame, 共有%d個點雲\n",num, point_cnt_array[num]);		
 				  }
 				  row_temp = row+row_temp;
 			  }
-			  /*
-			  for(int num=0; num < 3; ++num)  //顯示累積3FRAME的點雲數量
-			  {
-				  printf("第%d個frame, 共有%d個點雲\n",num, point_cnt_array[num]);		
+			  if (mode == 0)
+			  { 
+				  for(int num=0; num < 3; ++num)  //顯示累積3FRAME的點雲數量
+				  {
+					  printf("第%d個frame, 共有%d個點雲\n",num, point_cnt_array[num]);		
+				  }				  
 			  }
-			  */
+
+			  
 			  if (frame_number == 3) //重製frame_number
 			  {
 				  frame_number = 0;
@@ -837,4 +857,6 @@ int main(int argc, char *argv[]) {
 
 		}
   }
+  close(serial_port);
+  return 0; // success
 }

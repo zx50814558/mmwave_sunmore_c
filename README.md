@@ -70,7 +70,7 @@ cd <your repositories path>/sleeping
 ```
 
 2. If there is already **sleep_feature_min_rf.a** in the file, you can skip it. (**Choose one of the following two methods**)
-2-1. Download from google cloud: [sleep_feature_min_rf.a](http://https://drive.google.com/file/d/1RMtPBEp9sWlEiOaYhNV6nRzUIulaTSYc/view?usp=share_link "sleep_feature_min_rf.a")
+2-1. Download from google cloud: [sleep_feature_min_rf.a](http://https://drive.google.com/file/d/1RMtPBEp9sWlEiOaYhNV6nRzUIulaTSYc/view?usp=share_link "sleep_feature_min_rf.a")     
 2-2. Compiling RFC Model. (NEED TO INCREASE SWAP SPACE > 13GB, It takes about 2 to 3 days to compile)
 ```
 gcc -Os -c sleep_feature_min_rf.c -lm
